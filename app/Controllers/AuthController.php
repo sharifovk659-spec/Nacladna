@@ -190,6 +190,10 @@ class AuthController
             $_SESSION['company_id'] = (int)$company['id'];
             $_SESSION['company_name'] = $company['name'];
             $_SESSION['company_role'] = $company['role'];
+            $full = Company::findForCompany((int)$company['id'], (int)$company['id']);
+            if ($full) {
+                Company::syncSessionLocale($full);
+            }
             $sub = $this->getSubscription((int)$company['id']);
             SubscriptionMiddleware::syncSessionStatus($sub);
         }
