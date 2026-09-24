@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\Response;
 use App\Middleware\CurrentCompanyMiddleware;
 use App\Middleware\SubscriptionMiddleware;
+use App\Models\Subscription;
 
 class DashboardController
 {
@@ -64,13 +65,7 @@ class DashboardController
         $subSt->execute([$companyId]);
         $subscription = $subSt->fetch() ?: null;
 
-        $daysLeft = 0;
-        if ($subscription) {
-            $ends = strtotime($subscription['ends_at'] ?? $subscription['trial_end'] ?? '');
-            if ($ends) {
-                $daysLeft = max(0, (int)ceil(($ends - time()) / 86400));
-            }
-        }
+        $daysLeft = Subscription::daysRemaining($subscription);
 
         return [
             'user' => [

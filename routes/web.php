@@ -97,6 +97,7 @@ $router->post('/admin/login',        [AdminAuthController::class, 'login']);
 $router->post('/admin/logout',       [AdminAuthController::class, 'logout']);
 $router->get('/admin/dashboard',     [AdminDashboardController::class, 'index']);
 $router->get('/admin/companies',     [AdminCompanyController::class, 'index']);
+$router->get('/admin/companies/{id}', [AdminCompanyController::class, 'show']);
 $router->post('/admin/companies/{id}/activate',  [AdminCompanyController::class, 'activate']);
 $router->post('/admin/companies/{id}/suspend',   [AdminCompanyController::class, 'suspend']);
 $router->post('/admin/companies/{id}/extend',    [AdminCompanyController::class, 'extend']);

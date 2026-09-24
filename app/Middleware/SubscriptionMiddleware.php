@@ -2,8 +2,8 @@
 
 namespace App\Middleware;
 
-use App\Core\Database;
 use App\Core\Response;
+use App\Models\Subscription;
 
 class SubscriptionMiddleware
 {
@@ -11,29 +11,19 @@ class SubscriptionMiddleware
     {
         CurrentCompanyMiddleware::check();
         $companyId = CurrentCompanyMiddleware::companyId();
-        $sub = self::getSubscription($companyId);
+        $sub = self::loadSubscription($companyId);
 
         if (!$sub) {
             $_SESSION['sub_status'] = 'expired';
             Response::redirect('/subscription/expired');
         }
 
-        $ends = strtotime($sub['ends_at'] ?? $sub['trial_end'] ?? '');
-        $activeStatuses = ['trial', 'active'];
-
-        if ($ends && $ends < time()) {
-            self::expireSubscription((int)$sub['id']);
+        if (!Subscription::isWritable($sub)) {
             $_SESSION['sub_status'] = 'expired';
-            // Read-only: allow dashboard view, block writes via requireWrite()
             return;
         }
 
-        if (!in_array($sub['status'], $activeStatuses, true)) {
-            $_SESSION['sub_status'] = $sub['status'];
-            return;
-        }
-
-        $_SESSION['sub_status'] = $sub['status'];
+        self::syncSessionStatus($sub);
     }
 
     public static function isReadOnly(): bool
@@ -43,17 +33,8 @@ class SubscriptionMiddleware
             return true;
         }
 
-        $sub = self::getSubscription($companyId);
-        if (!$sub) {
-            return true;
-        }
-
-        if (!in_array($sub['status'], ['trial', 'active'], true)) {
-            return true;
-        }
-
-        $ends = strtotime($sub['ends_at'] ?? $sub['trial_end'] ?? '');
-        return $ends !== false && $ends < time();
+        $sub = self::loadSubscription($companyId);
+        return !Subscription::isWritable($sub);
     }
 
     public static function requireWrite(): void
@@ -69,32 +50,24 @@ class SubscriptionMiddleware
         }
     }
 
-    /** Map DB subscription row to sidebar/session badge key. */
     public static function sessionStatusFromRow(?array $sub): string
     {
-        if (!$sub) {
-            return 'expired';
-        }
-
-        $ends = strtotime($sub['ends_at'] ?? $sub['trial_end'] ?? '');
-        if ($ends && $ends < time()) {
-            return 'expired';
-        }
-
-        if (!in_array($sub['status'] ?? '', ['trial', 'active'], true)) {
-            return (string)($sub['status'] ?? 'expired');
-        }
-
-        if (($sub['plan'] ?? '') === 'trial') {
-            return 'trial';
-        }
-
-        return (string)($sub['status'] ?? 'active');
+        return Subscription::sessionStatusFromRow($sub);
     }
 
     public static function syncSessionStatus(?array $sub): void
     {
-        $_SESSION['sub_status'] = self::sessionStatusFromRow($sub);
+        $_SESSION['sub_status'] = Subscription::sessionStatusFromRow($sub);
+    }
+
+    private static function loadSubscription(int $companyId): ?array
+    {
+        $sub = Subscription::findForCompany($companyId);
+        if ($sub) {
+            Subscription::expireIfNeeded($sub);
+            $sub = Subscription::findForCompany($companyId);
+        }
+        return $sub;
     }
 
     private static function wantsJsonResponse(): bool
@@ -110,26 +83,5 @@ class SubscriptionMiddleware
         }
 
         return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-    }
-
-    private static function getSubscription(int $companyId): ?array
-    {
-        $db = Database::getInstance();
-        $st = $db->prepare(
-            "SELECT id, plan, status, trial_end, ends_at
-             FROM subscriptions
-             WHERE company_id = ?
-             ORDER BY id DESC
-             LIMIT 1"
-        );
-        $st->execute([$companyId]);
-        $row = $st->fetch();
-        return $row ?: null;
-    }
-
-    private static function expireSubscription(int $id): void
-    {
-        $db = Database::getInstance();
-        $db->prepare("UPDATE subscriptions SET status='expired', updated_at=NOW() WHERE id=?")->execute([$id]);
     }
 }

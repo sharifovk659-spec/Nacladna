@@ -230,6 +230,7 @@ jobs:
             echo "=== MVP smoke tests ==="
             php bin/smoke_mvp.php
             php bin/smoke_invoice.php
+            php bin/smoke_subscription.php
 
             echo "=== Deploy successful ==="
             echo "Backup: $BACKUP_DIR"

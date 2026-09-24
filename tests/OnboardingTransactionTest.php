@@ -71,7 +71,7 @@ class OnboardingTransactionTest extends TestCase
                 $trialEnd = date('Y-m-d H:i:s', strtotime('+3 days'));
                 $db->prepare(
                     "INSERT INTO subscriptions (company_id, plan, trial_start, trial_end, starts_at, ends_at, status)
-                     VALUES (?, 'trial', ?, ?, ?, ?, 'active')"
+                     VALUES (?, 'trial', ?, ?, ?, ?, 'trial')"
                 )->execute([$companyId, $now, $trialEnd, $now, $trialEnd]);
 
                 $db->commit();
@@ -104,7 +104,7 @@ class OnboardingTransactionTest extends TestCase
         $sub->execute([$companyId]);
         $subscription = $sub->fetch();
         $this->assertSame('trial', $subscription['plan']);
-        $this->assertSame('active', $subscription['status']);
+        $this->assertSame('trial', $subscription['status']);
         $this->assertGreaterThan(time() + 2 * 86400, strtotime($subscription['trial_end']));
 
         $this->assertSame(0, $create(), 'Duplicate onboarding must be blocked');

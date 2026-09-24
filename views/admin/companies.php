@@ -1,3 +1,16 @@
+<?php
+use App\Models\Subscription;
+/** @var array $periodOptions */
+function adminPeriodSelect(string $name, array $periodOptions, int $default = 1): string
+{
+    $html = '<select name="' . htmlspecialchars($name) . '" required style="padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">';
+    foreach ($periodOptions as $months => $opt) {
+        $sel = ((int)$months === $default) ? ' selected' : '';
+        $html .= '<option value="' . (int)$months . '"' . $sel . '>' . htmlspecialchars($opt['label']) . '</option>';
+    }
+    return $html . '</select>';
+}
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -11,7 +24,9 @@
 .admin-sidebar h1 { font-size:16px; padding:0 20px 16px; border-bottom:1px solid #374151; }
 .admin-sidebar a { display:block; padding:10px 20px; color:#d1d5db; text-decoration:none; font-size:14px; }
 .admin-sidebar a:hover, .admin-sidebar a.active { background:#374151; color:#fff; }
-.admin-main { flex:1; padding:24px 32px; background:#f9fafb; overflow-y:auto; }
+.admin-main { flex:1; padding:16px; background:#f9fafb; overflow-y:auto; }
+@media (min-width:768px) { .admin-main { padding:24px 32px; } }
+.table-wrap { overflow-x: auto; }
 </style>
 </head>
 <body>
@@ -35,39 +50,45 @@
       <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Поиск..." class="form-control" style="max-width:300px;">
     </form>
 
-    <div style="background:#fff; border-radius:12px; padding:0; box-shadow:0 1px 4px rgba(0,0,0,.06); overflow:hidden;">
+    <div class="table-wrap" style="background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06);">
       <table class="data-table">
         <thead>
-          <tr><th>ID</th><th>Компания</th><th>Владелец</th><th>Telegram</th><th>Накладные</th><th>Подписка</th><th>До</th><th>Действия</th></tr>
+          <tr><th>ID</th><th>Компания</th><th>Владелец</th><th>Накладные</th><th>Подписка</th><th>До</th><th>Действия</th></tr>
         </thead>
         <tbody>
-        <?php foreach ($companies as $co): ?>
+        <?php foreach ($companies as $co):
+          $subLabel = Subscription::planLabel([
+            'plan' => $co['plan'] ?? '',
+            'period_months' => $co['period_months'] ?? null,
+          ]);
+          ?>
         <tr>
-          <td><?= $co['id'] ?></td>
+          <td><?= (int)$co['id'] ?></td>
           <td>
             <strong><?= htmlspecialchars($co['name']) ?></strong><br>
-            <span class="badge badge-<?= $co['status'] === 'active' ? 'active' : 'expired' ?>"><?= $co['status'] ?></span>
+            <span class="badge badge-<?= $co['status'] === 'active' ? 'active' : 'expired' ?>"><?= htmlspecialchars($co['status']) ?></span>
           </td>
-          <td><?= htmlspecialchars(($co['first_name'] ?? '') . ' ' . ($co['last_name'] ?? '')) ?></td>
-          <td style="font-size:12px;">@<?= htmlspecialchars($co['telegram_username'] ?? '—') ?></td>
-          <td><?= $co['invoice_count'] ?></td>
-          <td><span class="badge badge-<?= $co['sub_status'] ?? 'expired' ?>"><?= $co['sub_status'] ?? '—' ?></span></td>
-          <td style="font-size:12px;"><?= $co['ends_at'] ? date('d.m.Y', strtotime($co['ends_at'])) : '—' ?></td>
+          <td><?= htmlspecialchars(trim(($co['first_name'] ?? '') . ' ' . ($co['last_name'] ?? ''))) ?></td>
+          <td><?= (int)$co['invoice_count'] ?></td>
           <td>
+            <span class="badge badge-<?= in_array($co['sub_status'] ?? '', ['trial','active'], true) ? 'active' : 'expired' ?>">
+              <?= htmlspecialchars($co['sub_status'] ?? '—') ?>
+            </span><br>
+            <small class="muted"><?= htmlspecialchars($subLabel) ?></small>
+          </td>
+          <td style="font-size:12px;"><?= !empty($co['ends_at']) ? date('d.m.Y', strtotime((string)$co['ends_at'])) : '—' ?></td>
+          <td>
+            <a href="/admin/companies/<?= (int)$co['id'] ?>" class="btn btn-sm btn-secondary" style="font-size:12px;margin-bottom:6px;display:inline-block;">История</a>
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <form method="POST" action="/admin/companies/<?= $co['id'] ?>/activate" style="display:flex; gap:4px;">
+              <form method="POST" action="/admin/companies/<?= (int)$co['id'] ?>/activate" style="display:flex; gap:4px; flex-wrap:wrap;">
                 <?= \App\Helpers\Csrf::field() ?>
-                <input type="number" name="days" value="30" min="1" max="365" style="width:60px; padding:4px 6px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px;">
-                <button type="submit" class="btn btn-sm btn-primary" style="font-size:12px;">✅ Активировать</button>
+                <?= adminPeriodSelect('period_months', $periodOptions, 1) ?>
+                <button type="submit" class="btn btn-sm btn-primary" style="font-size:12px;">Активировать</button>
               </form>
-              <form method="POST" action="/admin/companies/<?= $co['id'] ?>/extend" style="display:flex; gap:4px;">
+              <form method="POST" action="/admin/companies/<?= (int)$co['id'] ?>/extend" style="display:flex; gap:4px; flex-wrap:wrap;">
                 <?= \App\Helpers\Csrf::field() ?>
-                <input type="number" name="days" value="30" min="1" max="365" style="width:60px; padding:4px 6px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px;">
-                <button type="submit" class="btn btn-sm btn-outline" style="font-size:12px;">➕ Продлить</button>
-              </form>
-              <form method="POST" action="/admin/companies/<?= $co['id'] ?>/suspend">
-                <?= \App\Helpers\Csrf::field() ?>
-                <button type="submit" class="btn btn-sm btn-danger" style="font-size:12px;" onclick="return confirm('Приостановить компанию?')">🚫</button>
+                <?= adminPeriodSelect('period_months', $periodOptions, 3) ?>
+                <button type="submit" class="btn btn-sm btn-outline" style="font-size:12px;">Продлить</button>
               </form>
             </div>
           </td>

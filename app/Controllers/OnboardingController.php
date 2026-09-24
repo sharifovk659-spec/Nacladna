@@ -8,6 +8,7 @@ use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\SubscriptionMiddleware;
+use App\Models\Subscription;
 use App\Services\ActivityLogger;
 use App\Services\RateLimiter;
 
@@ -113,12 +114,10 @@ class OnboardingController
                 "INSERT INTO company_users (company_id, user_id, role, status) VALUES (?, ?, 'owner', 'active')"
             )->execute([$companyId, $userId]);
 
-            $now = date('Y-m-d H:i:s');
-            $trialEnd = date('Y-m-d H:i:s', strtotime('+3 days'));
-            $db->prepare(
-                "INSERT INTO subscriptions (company_id, plan, trial_start, trial_end, starts_at, ends_at, status)
-                 VALUES (?, 'trial', ?, ?, ?, ?, 'active')"
-            )->execute([$companyId, $now, $trialEnd, $now, $trialEnd]);
+            Subscription::createTrial($companyId);
+
+            $sub = Subscription::findForCompany($companyId);
+            $trialEnd = (string)($sub['ends_at'] ?? $sub['trial_end'] ?? date('Y-m-d H:i:s', strtotime('+3 days')));
 
             $db->commit();
 

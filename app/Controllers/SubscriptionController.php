@@ -2,10 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Core\Database;
 use App\Core\Response;
-use App\Middleware\AuthMiddleware;
 use App\Middleware\CompanyMiddleware;
+use App\Models\Subscription;
 use App\Services\ActivityLogger;
 
 class SubscriptionController
@@ -14,17 +13,17 @@ class SubscriptionController
     {
         CompanyMiddleware::check();
         $companyId = CompanyMiddleware::companyId();
-        $db        = Database::getInstance();
-
-        $sub = $db->prepare("SELECT * FROM subscriptions WHERE company_id=? ORDER BY id DESC LIMIT 1");
-        $sub->execute([$companyId]);
-        $subscription = $sub->fetch();
-
-        $daysLeft = 0;
+        $subscription = Subscription::findForCompany($companyId);
         if ($subscription) {
-            $ends     = strtotime($subscription['ends_at'] ?? $subscription['trial_end'] ?? '');
-            $daysLeft = max(0, (int)ceil(($ends - time()) / 86400));
+            Subscription::expireIfNeeded($subscription);
+            $subscription = Subscription::findForCompany($companyId);
         }
+
+        $daysLeft = Subscription::daysRemaining($subscription);
+        $history = Subscription::historyForCompany($companyId, 20);
+        $periodOptions = Subscription::periodOptions();
+        $planLabel = Subscription::planLabel($subscription);
+        $readOnly = !Subscription::isWritable($subscription);
 
         $pageTitle = 'Подписка';
         ob_start();
@@ -35,7 +34,7 @@ class SubscriptionController
 
     public function expired(): void
     {
-        AuthMiddleware::check();
+        \App\Middleware\AuthMiddleware::check();
         $pageTitle    = 'Подписка истекла';
         $hideNav      = true;
         $hideBottomNav = true;
@@ -51,8 +50,33 @@ class SubscriptionController
     {
         CompanyMiddleware::check();
         $companyId = CompanyMiddleware::companyId();
-        ActivityLogger::log('subscription_request', $companyId, $_SESSION['user_id']);
-        $_SESSION['flash_success'] = 'Запрос на продление подписки отправлен. Мы свяжемся с вами.';
+        $userId = (int)$_SESSION['user_id'];
+        $months = (int)($_POST['period_months'] ?? 1);
+        try {
+            $months = Subscription::assertPeriodMonths($months);
+        } catch (\Throwable) {
+            $months = 1;
+        }
+
+        $sub = Subscription::findForCompany($companyId);
+        Subscription::logHistory(
+            $companyId,
+            $sub ? (int)$sub['id'] : null,
+            'renewal_requested',
+            (string)($sub['plan'] ?? Subscription::PLAN_BUSINESS),
+            $months,
+            $sub['starts_at'] ?? null,
+            $sub['ends_at'] ?? $sub['trial_end'] ?? null,
+            (string)($sub['status'] ?? 'expired'),
+            'user',
+            $userId,
+            'Запрос ручной оплаты · ' . $months . ' мес.'
+        );
+
+        ActivityLogger::log('subscription_request', $companyId, $userId, 'subscription', null, [
+            'period_months' => $months,
+        ]);
+        $_SESSION['flash_success'] = 'Запрос отправлен. Администратор активирует подписку после оплаты.';
         Response::redirect('/subscription');
     }
 }
