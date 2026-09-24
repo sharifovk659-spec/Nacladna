@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Database;
 use App\Core\Response;
 use App\Middleware\CurrentCompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Subscription;
 
@@ -13,6 +14,7 @@ class DashboardController
     public function index(): void
     {
         CurrentCompanyMiddleware::check();
+        PermissionMiddleware::require('dashboard.view');
         SubscriptionMiddleware::check();
 
         $summary = $this->buildSummary(CurrentCompanyMiddleware::companyId());
@@ -34,6 +36,7 @@ class DashboardController
     public function summary(): void
     {
         CurrentCompanyMiddleware::check();
+        PermissionMiddleware::require('dashboard.view');
         SubscriptionMiddleware::check();
 
         Response::json([

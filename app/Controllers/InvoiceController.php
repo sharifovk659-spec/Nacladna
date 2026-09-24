@@ -7,6 +7,7 @@ use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\CompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Client;
 use App\Models\Invoice;
@@ -19,6 +20,7 @@ class InvoiceController
     public function index(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.view');
         $companyId = CompanyMiddleware::companyId();
         $search = trim($_GET['q'] ?? '');
         $status = trim($_GET['status'] ?? '');
@@ -39,6 +41,7 @@ class InvoiceController
     public function create(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.create');
         SubscriptionMiddleware::check();
 
         $pageTitle = 'Новая накладная';
@@ -57,6 +60,7 @@ class InvoiceController
     public function edit(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.edit');
         SubscriptionMiddleware::check();
 
         $companyId = CompanyMiddleware::companyId();
@@ -82,6 +86,7 @@ class InvoiceController
     public function store(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -107,6 +112,7 @@ class InvoiceController
     public function update(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.edit');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -132,6 +138,7 @@ class InvoiceController
     public function show(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.view');
         $companyId = CompanyMiddleware::companyId();
         $invoice = Invoice::findForCompany((int)$id, $companyId);
         if (!$invoice) { http_response_code(404); require ROOT_DIR . '/views/errors/404.php'; return; }
@@ -158,6 +165,7 @@ class InvoiceController
     public function pdf(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.print');
         $companyId = CompanyMiddleware::companyId();
         $invoice = Invoice::findForCompany((int)$id, $companyId);
         if (!$invoice) { http_response_code(404); die('Not found'); }
@@ -228,6 +236,7 @@ class InvoiceController
     public function duplicate(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -247,6 +256,7 @@ class InvoiceController
     public function cancel(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.cancel');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -266,6 +276,7 @@ class InvoiceController
     public function destroy(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.delete');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -286,6 +297,7 @@ class InvoiceController
     public function apiIndex(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.view');
         $companyId = CompanyMiddleware::companyId();
         Response::json(Invoice::all(
             $companyId,
@@ -302,6 +314,7 @@ class InvoiceController
     public function apiShow(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.view');
         $companyId = CompanyMiddleware::companyId();
         $invoice = Invoice::findForCompany((int)$id, $companyId);
         if (!$invoice) {
@@ -319,6 +332,7 @@ class InvoiceController
     public function apiStore(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -338,6 +352,7 @@ class InvoiceController
     public function apiUpdate(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.edit');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -356,6 +371,7 @@ class InvoiceController
     public function apiDelete(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.delete');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -374,6 +390,7 @@ class InvoiceController
     public function apiCancel(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.cancel');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -392,6 +409,7 @@ class InvoiceController
     public function apiDuplicate(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -409,6 +427,7 @@ class InvoiceController
     public function apiShare(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('invoices.share');
         $companyId = CompanyMiddleware::companyId();
         $invoice = Invoice::findForCompany((int)$id, $companyId);
         if (!$invoice) {
@@ -435,6 +454,7 @@ class InvoiceController
     public function apiCreateClient(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 

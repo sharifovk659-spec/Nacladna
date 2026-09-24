@@ -6,6 +6,7 @@ use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\CompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Product;
 use App\Services\ActivityLogger;
@@ -15,6 +16,7 @@ class ProductController
     public function index(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.view');
         $companyId = CompanyMiddleware::companyId();
         $search    = trim($_GET['q'] ?? '');
         $status    = trim($_GET['status'] ?? '');
@@ -32,6 +34,7 @@ class ProductController
     public function create(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.create');
         SubscriptionMiddleware::check();
         $pageTitle = 'Новый товар';
         $error     = $_SESSION['product_error'] ?? null;
@@ -46,6 +49,7 @@ class ProductController
     public function store(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -86,6 +90,7 @@ class ProductController
     public function edit(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.edit');
         SubscriptionMiddleware::check();
         $companyId = CompanyMiddleware::companyId();
         $product   = Product::findForCompany((int)$id, $companyId);
@@ -107,6 +112,7 @@ class ProductController
     public function update(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.edit');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -165,6 +171,7 @@ class ProductController
     public function search(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('products.view');
         $companyId = CompanyMiddleware::companyId();
         $q         = trim($_GET['q'] ?? '');
         if ($q === '') {

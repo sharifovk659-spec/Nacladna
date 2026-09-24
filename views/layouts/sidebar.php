@@ -22,6 +22,11 @@
     <a href="/profile" class="nav-item <?= str_starts_with($_SERVER['REQUEST_URI'], '/profile') ? 'active' : '' ?>">
       <span class="nav-icon">👤</span> Профиль
     </a>
+    <?php if (\App\Middleware\PermissionMiddleware::can('employees.view')): ?>
+    <a href="/employees" class="nav-item <?= str_starts_with($_SERVER['REQUEST_URI'], '/employees') ? 'active' : '' ?>">
+      <span class="nav-icon">🧑‍💼</span> Сотрудники
+    </a>
+    <?php endif; ?>
   </nav>
   <div class="sidebar-footer">
     <a href="/subscription" class="sub-status">

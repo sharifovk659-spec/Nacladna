@@ -6,7 +6,7 @@ use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\CompanyMiddleware;
-use App\Middleware\OwnerMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Company;
 use App\Services\ActivityLogger;
@@ -16,7 +16,7 @@ class SettingsController
     public function index(): void
     {
         CompanyMiddleware::check();
-        OwnerMiddleware::check();
+        PermissionMiddleware::require('settings.view');
 
         $companyId = CompanyMiddleware::companyId();
         $company = Company::findForCompany($companyId, $companyId);
@@ -45,7 +45,7 @@ class SettingsController
     public function update(): void
     {
         CompanyMiddleware::check();
-        OwnerMiddleware::check();
+        PermissionMiddleware::require('settings.edit');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 

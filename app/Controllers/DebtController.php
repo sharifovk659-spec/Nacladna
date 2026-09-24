@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Middleware\CompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Services\ActivityLogger;
 
@@ -14,6 +15,7 @@ class DebtController
     public function index(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('debts.view');
         $companyId = CompanyMiddleware::companyId();
         $db        = Database::getInstance();
         $search    = trim($_GET['q'] ?? '');
@@ -55,6 +57,7 @@ class DebtController
     public function show(string $clientId): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('debts.view');
         $companyId = CompanyMiddleware::companyId();
         $db        = Database::getInstance();
 
@@ -99,6 +102,8 @@ class DebtController
     public function pay(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('debts.manage');
+        PermissionMiddleware::require('payments.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 

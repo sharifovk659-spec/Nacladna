@@ -13,6 +13,8 @@ use App\Controllers\DebtController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\ProfileController;
 use App\Controllers\SettingsController;
+use App\Controllers\EmployeeController;
+use App\Controllers\JoinController;
 use App\Controllers\MediaController;
 use App\Controllers\Admin\AdminAuthController;
 use App\Controllers\Admin\AdminDashboardController;
@@ -98,6 +100,17 @@ $router->post('/profile/company',    [SettingsController::class, 'update']);
 
 $router->get('/settings',            [SettingsController::class, 'index']);
 $router->post('/settings',           [SettingsController::class, 'update']);
+
+// Employee invites (public token link)
+$router->get('/join/{token}',        [JoinController::class, 'show']);
+
+// Employees
+$router->get('/employees',                    [EmployeeController::class, 'index']);
+$router->get('/employees/create',             [EmployeeController::class, 'create']);
+$router->post('/employees',                   [EmployeeController::class, 'store']);
+$router->get('/employees/{id}/edit',          [EmployeeController::class, 'edit']);
+$router->post('/employees/{id}',            [EmployeeController::class, 'update']);
+$router->post('/employees/invites/{id}/revoke', [EmployeeController::class, 'revokeInvite']);
 
 // Admin
 $router->get('/admin',               [AdminAuthController::class, 'loginPage']);

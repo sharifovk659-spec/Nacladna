@@ -188,13 +188,18 @@ $botUrl = $botUsername !== '' ? 'https://t.me/' . rawurlencode($botUsername) : '
     }
 
     try {
+      const inviteToken = <?= json_encode($_SESSION['employee_invite_token'] ?? '', JSON_UNESCAPED_UNICODE) ?>;
+      let body = 'initData=' + encodeURIComponent(tg.initData);
+      if (inviteToken) {
+        body += '&invite_token=' + encodeURIComponent(inviteToken);
+      }
       const res = await fetch('/api/auth/telegram', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
         },
-        body: 'initData=' + encodeURIComponent(tg.initData),
+        body: body,
         credentials: 'same-origin'
       });
       const data = await res.json().catch(() => ({}));

@@ -66,6 +66,33 @@ class AuthController
         }
 
         $user = User::createOrUpdate($tgUser);
+
+        $inviteToken = trim((string)($_POST['invite_token'] ?? $_SESSION['employee_invite_token'] ?? ''));
+        if ($inviteToken !== '') {
+            try {
+                $linked = \App\Models\EmployeeInvite::consume($inviteToken, (int)$user['id']);
+                unset($_SESSION['employee_invite_token']);
+                $company = User::getCompany((int)$user['id']);
+                $limiter->clear("tg_login:{$ip}");
+                $this->startSession($user, $company);
+                ActivityLogger::log('employee_invite_accepted', (int)$linked['company_id'], (int)$user['id']);
+                Response::json([
+                    'success' => true,
+                    'onboarding_required' => false,
+                    'redirect' => '/dashboard',
+                    'csrf_token' => Csrf::token(),
+                    'user' => [
+                        'id' => (int)$user['id'],
+                        'first_name' => $user['first_name'],
+                        'last_name' => $user['last_name'],
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                Logger::warn('Invite consume failed', ['error' => $e->getMessage()]);
+                Response::json(['error' => $e->getMessage(), 'code' => 'invite_failed'], 400);
+            }
+        }
+
         $company = User::getCompany((int)$user['id']);
 
         $limiter->clear("tg_login:{$ip}");
@@ -101,6 +128,7 @@ class AuthController
             $_SESSION['company_id'] = (int)$company['id'];
             $_SESSION['company_name'] = $company['name'];
             $_SESSION['company_role'] = $company['role'];
+            \App\Models\Permission::syncSession((int)$_SESSION['user_id'], (int)$company['id']);
             $sub = $this->getSubscription((int)$company['id']);
             SubscriptionMiddleware::syncSessionStatus($sub);
         }
@@ -184,12 +212,13 @@ class AuthController
             'photo_url' => $user['photo_url'],
         ];
 
-        unset($_SESSION['company_id'], $_SESSION['company_name'], $_SESSION['company_role'], $_SESSION['sub_status']);
+        unset($_SESSION['company_id'], $_SESSION['company_name'], $_SESSION['company_role'], $_SESSION['sub_status'], $_SESSION['permissions'], $_SESSION['company_user_id']);
 
         if ($company) {
             $_SESSION['company_id'] = (int)$company['id'];
             $_SESSION['company_name'] = $company['name'];
             $_SESSION['company_role'] = $company['role'];
+            \App\Models\Permission::syncSession((int)$user['id'], (int)$company['id']);
             $full = Company::findForCompany((int)$company['id'], (int)$company['id']);
             if ($full) {
                 Company::syncSessionLocale($full);

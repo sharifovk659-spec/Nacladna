@@ -40,6 +40,8 @@ class CurrentCompanyMiddleware
         $_SESSION['company_id']   = (int)$row['id'];
         $_SESSION['company_name'] = $row['name'];
         $_SESSION['company_role'] = $row['role'];
+
+        \App\Models\Permission::syncSession($userId, (int)$row['id']);
     }
 
     public static function companyId(): int
@@ -55,6 +57,12 @@ class CurrentCompanyMiddleware
     public static function isOwner(): bool
     {
         return self::role() === 'owner';
+    }
+
+    public static function isAdmin(): bool
+    {
+        $r = self::role();
+        return $r === 'owner' || $r === 'admin';
     }
 
     private static function isApi(): bool

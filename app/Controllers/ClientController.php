@@ -6,6 +6,7 @@ use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\CompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Client;
 use App\Services\ActivityLogger;
@@ -15,6 +16,7 @@ class ClientController
     public function index(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.view');
         $companyId = CompanyMiddleware::companyId();
         $search    = trim($_GET['q'] ?? '');
         $status    = trim($_GET['status'] ?? '');
@@ -32,6 +34,7 @@ class ClientController
     public function create(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.create');
         SubscriptionMiddleware::check();
         $pageTitle = 'Новый клиент';
         $error     = $_SESSION['client_error'] ?? null;
@@ -46,6 +49,7 @@ class ClientController
     public function store(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.create');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -84,6 +88,7 @@ class ClientController
     public function show(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.view');
         $companyId = CompanyMiddleware::companyId();
         $client    = Client::findForCompany((int)$id, $companyId);
         if (!$client) {
@@ -103,16 +108,8 @@ class ClientController
     public function edit(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.edit');
         SubscriptionMiddleware::check();
-        $companyId = CompanyMiddleware::companyId();
-        $client    = Client::findForCompany((int)$id, $companyId);
-        if (!$client) {
-            http_response_code(404);
-            require ROOT_DIR . '/views/errors/404.php';
-            return;
-        }
-
-        $pageTitle = 'Редактировать клиента';
         $error     = $_SESSION['client_error'] ?? null;
         unset($_SESSION['client_error']);
         ob_start();
@@ -124,6 +121,7 @@ class ClientController
     public function update(string $id): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.edit');
         SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
@@ -180,6 +178,7 @@ class ClientController
     public function search(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('clients.view');
         $companyId = CompanyMiddleware::companyId();
         $q         = trim($_GET['q'] ?? '');
         if ($q === '') {

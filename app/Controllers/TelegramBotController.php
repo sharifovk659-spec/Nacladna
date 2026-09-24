@@ -54,6 +54,19 @@ class TelegramBotController
             return;
         }
 
+        if (str_starts_with($text, '/start join_')) {
+            $token = substr($text, strlen('/start join_'));
+            $appUrl = rtrim($_ENV['APP_URL'] ?? 'https://nakladna.inovaauto.com', '/') . '/join/' . rawurlencode($token);
+            $this->sendMessage($chatId, "Приглашение в команду Nakladna Cloud.\n\nНажмите кнопку ниже, чтобы войти через Telegram.", [
+                'reply_markup' => json_encode([
+                    'inline_keyboard' => [[
+                        ['text' => 'Принять приглашение', 'web_app' => ['url' => $appUrl]]
+                    ]]
+                ], JSON_UNESCAPED_UNICODE)
+            ]);
+            return;
+        }
+
         if (str_starts_with($text, '/invoice ')) {
             $invoiceId = (int)substr($text, 9);
             $this->sendInvoicePdf($chatId, $telegramId, $invoiceId);

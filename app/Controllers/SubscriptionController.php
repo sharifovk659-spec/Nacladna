@@ -4,6 +4,8 @@ namespace App\Controllers;
 
 use App\Core\Response;
 use App\Middleware\CompanyMiddleware;
+use App\Middleware\PermissionMiddleware;
+use App\Middleware\SubscriptionMiddleware;
 use App\Models\Subscription;
 use App\Services\ActivityLogger;
 
@@ -12,6 +14,7 @@ class SubscriptionController
     public function index(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('subscription.view');
         $companyId = CompanyMiddleware::companyId();
         $subscription = Subscription::findForCompany($companyId);
         if ($subscription) {
@@ -49,6 +52,10 @@ class SubscriptionController
     public function request(): void
     {
         CompanyMiddleware::check();
+        PermissionMiddleware::require('subscription.view');
+        SubscriptionMiddleware::requireWrite();
+        Csrf::verifyRequest();
+
         $companyId = CompanyMiddleware::companyId();
         $userId = (int)$_SESSION['user_id'];
         $months = (int)($_POST['period_months'] ?? 1);

@@ -237,6 +237,7 @@ jobs:
             php bin/smoke_subscription.php
             php bin/smoke_settings.php
             php bin/smoke_logo.php
+            php bin/smoke_roles.php
 
             echo "=== Deploy successful ==="
             echo "Backup: $BACKUP_DIR"
