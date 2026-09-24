@@ -99,9 +99,10 @@ class SubscriptionModuleTest extends TestCase
     public function testExpiryMakesReadOnly(): void
     {
         $db = Database::getInstance();
+        $past = date('Y-m-d H:i:s', time() - 86400 * 5);
         $db->prepare(
-            "UPDATE subscriptions SET ends_at = DATE_SUB(NOW(), INTERVAL 1 DAY), status = 'active' WHERE company_id = ?"
-        )->execute([self::$companyA]);
+            "UPDATE subscriptions SET ends_at = ?, status = 'active' WHERE company_id = ?"
+        )->execute([$past, self::$companyA]);
         $sub = Subscription::findForCompany(self::$companyA);
         Subscription::expireIfNeeded($sub);
         $sub = Subscription::findForCompany(self::$companyA);
