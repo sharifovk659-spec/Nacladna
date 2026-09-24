@@ -48,6 +48,7 @@ $endsAt = $subscription['ends_at'] ?? $subscription['trial_end'] ?? null;
     </div>
     <form method="POST" action="/subscription/request" class="sub-request-form">
       <?= \App\Helpers\Csrf::field() ?>
+      <?= \App\Helpers\Csrf::field() ?>
       <label class="form-label" for="period_months">Выберите период</label>
       <select name="period_months" id="period_months" class="form-control" required>
         <?php foreach ($periodOptions as $months => $opt): ?>

@@ -32,7 +32,7 @@ curl_close($ch);
 $pass('GET /employees auth gate (302)', $code === 302);
 
 $ch = curl_init($base . '/join/invalid-token-test');
-curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 15]);
+curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_TIMEOUT => 15]);
 curl_exec($ch);
 $joinCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
