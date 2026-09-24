@@ -28,7 +28,21 @@
 
   <div class="card">
     <h3 style="margin-bottom:10px;">Товары</h3>
-    <div class="table-wrap">
+    <div class="public-items-mobile">
+      <?php foreach ($items as $item):
+        $q = (float)$item['quantity'];
+        $qTxt = abs($q - round($q)) < 0.0005 ? (string)(int)round($q) : rtrim(rtrim(number_format($q, 3, '.', ''), '0'), '.');
+        ?>
+        <div class="public-item-card">
+          <div class="public-item-name"><?= htmlspecialchars((string)$item['product_name']) ?></div>
+          <div class="public-item-row">
+            <span><?= htmlspecialchars($qTxt) ?> <?= htmlspecialchars((string)$item['unit']) ?> × <?= number_format((float)$item['unit_price'], 2, '.', ' ') ?> с.</span>
+            <strong><?= number_format((float)$item['line_total'], 2, '.', ' ') ?> с.</strong>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <div class="table-wrap public-items-desktop">
       <table class="data-table">
         <thead>
           <tr>
@@ -80,4 +94,14 @@
 .public-brand { font-size: 14px; font-weight: 700; color: #16a34a; }
 .public-title { font-size: 24px; margin-top: 12px; color: #111827; }
 .muted { color: #6b7280; font-size: 13px; }
+.public-items-mobile { display: grid; gap: 10px; }
+.public-item-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fafafa; }
+.public-item-name { font-weight: 700; font-size: 15px; margin-bottom: 6px; word-break: break-word; }
+.public-item-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #4b5563; }
+.public-items-desktop { display: none; }
+@media (min-width: 640px) {
+  .public-items-mobile { display: none; }
+  .public-items-desktop { display: block; }
+  .public-title { font-size: 28px; }
+}
 </style>

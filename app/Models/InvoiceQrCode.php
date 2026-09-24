@@ -12,11 +12,41 @@ use Endroid\QrCode\Writer\PngWriter;
 
 class InvoiceQrCode
 {
+    /** Create or return active QR for a finalized (non-draft, non-cancelled) invoice. */
+    public static function syncForInvoice(int $invoiceId, int $companyId): ?array
+    {
+        $invoice = Invoice::findForCompany($invoiceId, $companyId);
+        if (!$invoice) {
+            return null;
+        }
+        if (in_array($invoice['status'], ['draft', 'cancelled'], true)) {
+            self::revokeForInvoice($invoiceId, $companyId);
+            return null;
+        }
+        return self::ensureForInvoice($invoiceId, $companyId);
+    }
+
     public static function ensureForInvoice(int $invoiceId, int $companyId): array
     {
         $existing = self::findByInvoice($invoiceId, $companyId);
         if ($existing) {
             return $existing;
+        }
+
+        $db = Database::getInstance();
+        $st = $db->prepare(
+            "SELECT * FROM invoice_qr_codes WHERE invoice_id = ? AND company_id = ? LIMIT 1"
+        );
+        $st->execute([$invoiceId, $companyId]);
+        $inactive = $st->fetch();
+        if ($inactive) {
+            $db->prepare(
+                "UPDATE invoice_qr_codes SET is_active = 1, updated_at = NOW() WHERE id = ?"
+            )->execute([(int)$inactive['id']]);
+            $reactivated = self::findByInvoice($invoiceId, $companyId);
+            if ($reactivated) {
+                return $reactivated;
+            }
         }
 
         $uuid = self::generateUuid();
@@ -38,6 +68,16 @@ class InvoiceQrCode
         return $created;
     }
 
+    public static function revokeForInvoice(int $invoiceId, int $companyId): void
+    {
+        $db = Database::getInstance();
+        $db->prepare(
+            "UPDATE invoice_qr_codes
+             SET is_active = 0, updated_at = NOW()
+             WHERE invoice_id = ? AND company_id = ?"
+        )->execute([$invoiceId, $companyId]);
+    }
+
     public static function findByInvoice(int $invoiceId, int $companyId): ?array
     {
         $db = Database::getInstance();
@@ -51,32 +91,52 @@ class InvoiceQrCode
         return $st->fetch() ?: null;
     }
 
-    public static function findByUuid(string $uuid): ?array
+    /** Public lookup — returns null → 404 (invalid, revoked, deleted, cancelled). */
+    public static function findPublicByUuid(string $uuid): ?array
     {
         $uuid = trim($uuid);
-        if ($uuid === '' || !preg_match('/^[0-9a-fA-F-]{36}$/', $uuid)) {
+        if ($uuid === '' || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $uuid)) {
             return null;
         }
 
         $db = Database::getInstance();
         $st = $db->prepare(
-            "SELECT q.*, i.invoice_number, i.invoice_date, i.subtotal, i.discount, i.total,
-                    i.paid_amount, i.debt_amount, i.status, i.payment_status, i.notes, i.deleted_at,
-                    c.name AS company_name, c.phone AS company_phone, c.address AS company_address,
-                    c.logo_path, cl.name AS client_name, cl.phone AS client_phone
+            "SELECT q.id AS qr_id, q.public_uuid, q.public_url, q.qr_image_path,
+                    i.id AS invoice_id, i.invoice_number, i.invoice_date,
+                    i.subtotal, i.discount, i.total, i.paid_amount, i.debt_amount,
+                    i.status, i.payment_status, i.notes,
+                    c.name AS company_name, c.phone AS company_phone,
+                    cl.name AS client_name, cl.phone AS client_phone
              FROM invoice_qr_codes q
-             JOIN invoices i ON i.id = q.invoice_id
-             JOIN companies c ON c.id = q.company_id
+             INNER JOIN invoices i ON i.id = q.invoice_id AND i.company_id = q.company_id
+             INNER JOIN companies c ON c.id = q.company_id AND c.status = 'active'
              LEFT JOIN clients cl ON cl.id = i.client_id
-             WHERE q.public_uuid = ? AND q.is_active = 1
+             WHERE q.public_uuid = ?
+               AND q.is_active = 1
+               AND i.deleted_at IS NULL
+               AND i.status <> 'cancelled'
              LIMIT 1"
         );
         $st->execute([$uuid]);
         $row = $st->fetch();
-        if (!$row || $row['deleted_at'] !== null) {
-            return null;
+        return $row ?: null;
+    }
+
+    /** Strip internal fields from line items for public display. */
+    public static function mapPublicItems(array $items): array
+    {
+        $safe = [];
+        foreach ($items as $item) {
+            $safe[] = [
+                'product_name' => (string)($item['product_name'] ?? ''),
+                'unit' => (string)($item['unit'] ?? ''),
+                'quantity' => (float)($item['quantity'] ?? 0),
+                'unit_price' => (float)($item['unit_price'] ?? 0),
+                'discount' => (float)($item['discount'] ?? 0),
+                'line_total' => (float)($item['line_total'] ?? 0),
+            ];
         }
-        return $row;
+        return $safe;
     }
 
     public static function recordScan(int $qrId): void
@@ -85,14 +145,23 @@ class InvoiceQrCode
         $db->prepare(
             "UPDATE invoice_qr_codes
              SET scan_count = scan_count + 1, last_scanned_at = NOW(), updated_at = NOW()
-             WHERE id = ?"
+             WHERE id = ? AND is_active = 1"
         )->execute([$qrId]);
     }
 
     public static function publicUrlForInvoice(array $invoice): string
     {
-        $qr = self::ensureForInvoice((int)$invoice['id'], (int)$invoice['company_id']);
-        return $qr['public_url'];
+        $companyId = (int)($invoice['company_id'] ?? 0);
+        $invoiceId = (int)($invoice['id'] ?? 0);
+        if ($companyId <= 0 || $invoiceId <= 0) {
+            return self::buildPublicUrl('00000000-0000-4000-8000-000000000000');
+        }
+        $qr = self::syncForInvoice($invoiceId, $companyId);
+        if (!$qr) {
+            $base = rtrim($_ENV['APP_URL'] ?? '', '/');
+            return ($base !== '' ? $base : '') . '/invoices/' . $invoiceId;
+        }
+        return (string)$qr['public_url'];
     }
 
     public static function dataUri(string $publicUrl): string
@@ -109,6 +178,18 @@ class InvoiceQrCode
             ->build();
 
         return $result->getDataUri();
+    }
+
+    public static function imageDataUri(?string $relativePath, string $fallbackUrl): string
+    {
+        if ($relativePath) {
+            $full = ROOT_DIR . '/' . ltrim($relativePath, '/');
+            if (is_file($full)) {
+                $b64 = base64_encode((string)file_get_contents($full));
+                return 'data:image/png;base64,' . $b64;
+            }
+        }
+        return self::dataUri($fallbackUrl);
     }
 
     private static function generateAndStoreImage(int $companyId, int $invoiceId, string $uuid, string $publicUrl): ?string

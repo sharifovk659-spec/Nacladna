@@ -10,6 +10,7 @@ use App\Middleware\CompanyMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\InvoiceQrCode;
 use App\Services\ActivityLogger;
 use App\Services\PdfService;
 
@@ -98,6 +99,7 @@ class InvoiceController
         }
 
         ActivityLogger::log('invoice_created', $companyId, $userId, 'invoice', $result['id']);
+        InvoiceQrCode::syncForInvoice((int)$result['id'], $companyId);
         $_SESSION['flash_success'] = 'Накладная ' . ($result['number'] ?? '') . ' создана!';
         Response::redirect('/invoices/' . $result['id']);
     }
@@ -122,6 +124,7 @@ class InvoiceController
         }
 
         ActivityLogger::log('invoice_updated', $companyId, $userId, 'invoice', $result['id']);
+        InvoiceQrCode::syncForInvoice((int)$result['id'], $companyId);
         $_SESSION['flash_success'] = 'Накладная обновлена.';
         Response::redirect('/invoices/' . $result['id']);
     }
@@ -135,6 +138,11 @@ class InvoiceController
 
         $items = Invoice::getItems((int)$id);
         $payments = Invoice::getPayments((int)$id);
+        $qr = InvoiceQrCode::syncForInvoice((int)$id, $companyId);
+        $qrImageDataUri = $qr
+            ? InvoiceQrCode::imageDataUri($qr['qr_image_path'] ?? null, (string)$qr['public_url'])
+            : null;
+        $publicShareUrl = $qr ? (string)$qr['public_url'] : Invoice::shareUrl($invoice);
         $pageTitle = 'Накладная ' . $invoice['invoice_number'];
         ob_start();
         require ROOT_DIR . '/views/invoices/show.php';
@@ -155,13 +163,59 @@ class InvoiceController
         $company->execute([$companyId]);
         $company = $company->fetch();
 
+        $qr = InvoiceQrCode::syncForInvoice((int)$id, $companyId);
+        $qrImageDataUri = $qr
+            ? InvoiceQrCode::imageDataUri($qr['qr_image_path'] ?? null, (string)$qr['public_url'])
+            : null;
+
         $pdf = new PdfService();
-        $pdf->generate($invoice, $items, $company);
+        $pdf->generate($invoice, $items, $company, $qrImageDataUri, $qr['public_url'] ?? null);
     }
 
     public function print(string $id): void
     {
         $this->pdf($id);
+    }
+
+    /** Public read-only invoice page (QR link). No authentication. */
+    public function publicShow(string $uuid): void
+    {
+        $public = InvoiceQrCode::findPublicByUuid($uuid);
+        if (!$public) {
+            http_response_code(404);
+            require ROOT_DIR . '/views/errors/404.php';
+            return;
+        }
+
+        InvoiceQrCode::recordScan((int)$public['qr_id']);
+        $items = InvoiceQrCode::mapPublicItems(Invoice::getItems((int)$public['invoice_id']));
+
+        $invoice = [
+            'invoice_number' => $public['invoice_number'],
+            'invoice_date' => $public['invoice_date'],
+            'subtotal' => $public['subtotal'],
+            'discount' => $public['discount'],
+            'total' => $public['total'],
+            'paid_amount' => $public['paid_amount'],
+            'debt_amount' => $public['status'] === 'cancelled' ? 0 : $public['debt_amount'],
+            'status' => $public['status'],
+            'notes' => $public['notes'],
+            'client_name' => $public['client_name'],
+            'client_phone' => $public['client_phone'],
+        ];
+        $company = [
+            'name' => $public['company_name'],
+            'phone' => $public['company_phone'],
+        ];
+
+        $pageTitle = 'Накладная ' . $invoice['invoice_number'];
+        $hideNav = true;
+        $hideHeader = true;
+        $hideBottomNav = true;
+        ob_start();
+        require ROOT_DIR . '/views/invoices/public.php';
+        $content = ob_get_clean();
+        require ROOT_DIR . '/views/layouts/app.php';
     }
 
     public function duplicate(string $id): void
@@ -193,6 +247,7 @@ class InvoiceController
         $userId = (int)$_SESSION['user_id'];
         try {
             Invoice::cancel((int)$id, $companyId, $userId);
+            InvoiceQrCode::revokeForInvoice((int)$id, $companyId);
             ActivityLogger::log('invoice_cancelled', $companyId, $userId, 'invoice', (int)$id);
             $_SESSION['flash_success'] = 'Накладная отменена.';
         } catch (\Throwable $e) {
@@ -211,6 +266,7 @@ class InvoiceController
         $userId = (int)$_SESSION['user_id'];
         try {
             Invoice::softDelete((int)$id, $companyId, $userId);
+            InvoiceQrCode::revokeForInvoice((int)$id, $companyId);
             ActivityLogger::log('invoice_deleted', $companyId, $userId, 'invoice', (int)$id);
             $_SESSION['flash_success'] = 'Накладная удалена.';
             Response::redirect('/invoices');
@@ -265,6 +321,7 @@ class InvoiceController
             $payload = $this->payloadFromJsonRequest();
             $result = Invoice::create($companyId, $userId, $payload);
             ActivityLogger::log('invoice_created_api', $companyId, $userId, 'invoice', $result['id']);
+            InvoiceQrCode::syncForInvoice((int)$result['id'], $companyId);
             Response::json(['ok' => true] + $result, 201);
         } catch (\Throwable $e) {
             Response::json(['error' => $e->getMessage()], 422);
@@ -282,6 +339,7 @@ class InvoiceController
         try {
             $result = Invoice::update((int)$id, $companyId, $userId, $this->payloadFromJsonRequest());
             ActivityLogger::log('invoice_updated_api', $companyId, $userId, 'invoice', $result['id']);
+            InvoiceQrCode::syncForInvoice((int)$result['id'], $companyId);
             Response::json(['ok' => true] + $result);
         } catch (\Throwable $e) {
             Response::json(['error' => $e->getMessage()], 422);
@@ -298,6 +356,7 @@ class InvoiceController
         $userId = (int)$_SESSION['user_id'];
         try {
             Invoice::softDelete((int)$id, $companyId, $userId);
+            InvoiceQrCode::revokeForInvoice((int)$id, $companyId);
             ActivityLogger::log('invoice_deleted_api', $companyId, $userId, 'invoice', (int)$id);
             Response::json(['ok' => true]);
         } catch (\Throwable $e) {
@@ -315,6 +374,7 @@ class InvoiceController
         $userId = (int)$_SESSION['user_id'];
         try {
             Invoice::cancel((int)$id, $companyId, $userId);
+            InvoiceQrCode::revokeForInvoice((int)$id, $companyId);
             ActivityLogger::log('invoice_cancelled_api', $companyId, $userId, 'invoice', (int)$id);
             Response::json(['ok' => true]);
         } catch (\Throwable $e) {
@@ -348,10 +408,21 @@ class InvoiceController
             Response::json(['error' => 'Not found'], 404);
         }
 
-        Response::json([
+        $qr = InvoiceQrCode::syncForInvoice((int)$id, $companyId);
+        $shareUrl = $qr ? (string)$qr['public_url'] : Invoice::shareUrl($invoice);
+        $payload = [
             'ok' => true,
-            'share_url' => Invoice::shareUrl($invoice),
-        ]);
+            'share_url' => $shareUrl,
+        ];
+        if ($qr) {
+            $payload['public_uuid'] = (string)$qr['public_uuid'];
+            $payload['qr_image_data_uri'] = InvoiceQrCode::imageDataUri(
+                $qr['qr_image_path'] ?? null,
+                (string)$qr['public_url']
+            );
+        }
+
+        Response::json($payload);
     }
 
     public function apiCreateClient(): void

@@ -56,4 +56,16 @@ class InvoiceHttpTest extends TestCase
         // Unauthenticated or CSRF/forbidden
         $this->assertContains($code, [302, 303, 401, 403], 'POST /api/invoices must reject unauth/csrf');
     }
+
+    public function testPublicInvoiceQrDoesNotRequireAuth(): void
+    {
+        if (!$this->reachable()) {
+            $this->markTestSkipped('Local server not running');
+        }
+
+        $ctx = stream_context_create(['http' => ['ignore_errors' => true, 'follow_location' => 0, 'timeout' => 5]]);
+        @file_get_contents($this->baseUrl . '/invoice/public/not-a-valid-uuid', false, $ctx);
+        $code = (int)explode(' ', $http_response_header[0])[1];
+        $this->assertSame(404, $code, 'Invalid public UUID should 404 without redirect to login');
+    }
 }

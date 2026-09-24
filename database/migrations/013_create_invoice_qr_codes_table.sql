@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS invoice_qr_codes (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    invoice_id INT UNSIGNED NOT NULL,
+    company_id INT UNSIGNED NOT NULL,
+    public_uuid CHAR(36) NOT NULL,
+    public_url VARCHAR(512) NOT NULL,
+    qr_image_path VARCHAR(512) NULL,
+    scan_count INT UNSIGNED NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_scanned_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_invoice_qr_invoice (invoice_id),
+    UNIQUE KEY uq_invoice_qr_uuid (public_uuid),
+    KEY idx_invoice_qr_company (company_id),
+    KEY idx_invoice_qr_active (is_active),
+    CONSTRAINT fk_invoice_qr_invoice FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
+    CONSTRAINT fk_invoice_qr_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

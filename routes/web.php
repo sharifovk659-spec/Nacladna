@@ -22,6 +22,9 @@ use App\Controllers\TelegramBotController;
 // Health
 $router->get('/health', [HealthController::class, 'index']);
 
+// Public invoice QR view (no auth)
+$router->get('/invoice/public/{uuid}', [InvoiceController::class, 'publicShow']);
+
 // Foundation home
 $router->get('/', [HomeController::class, 'index']);
 

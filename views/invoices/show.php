@@ -84,6 +84,20 @@ $id = (int)$invoice['id'];
     </div>
   <?php endif; ?>
 
+  <?php if (!empty($qrImageDataUri) && !empty($publicShareUrl) && ($invoice['status'] ?? '') !== 'draft' && ($invoice['status'] ?? '') !== 'cancelled'): ?>
+  <div class="inv-qr">
+    <div class="inv-meta-label">Публичная ссылка (QR)</div>
+    <div class="inv-qr-body">
+      <img src="<?= htmlspecialchars($qrImageDataUri) ?>" alt="QR код накладной" class="inv-qr-img" width="160" height="160">
+      <div class="inv-qr-meta">
+        <p class="inv-qr-hint">Клиент может отсканировать код и открыть накладную без входа в систему.</p>
+        <input type="text" class="inv-qr-url" readonly value="<?= htmlspecialchars($publicShareUrl) ?>" id="publicShareUrl">
+        <button type="button" class="btn btn-secondary btn-full inv-qr-copy" onclick="copyPublicUrl()">Копировать ссылку</button>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <div class="inv-actions">
     <a href="/invoices/<?= $id ?>/pdf" target="_blank" class="btn btn-primary inv-pdf-btn">📄 Скачать PDF</a>
     <button type="button" class="inv-icon-btn" onclick="shareInvoice()" title="Поделиться">↗</button>
@@ -165,6 +179,22 @@ $id = (int)$invoice['id'];
   font-size:18px; cursor:pointer;
 }
 .inv-more { display:grid; gap:8px; }
+.inv-qr {
+  background:#fff; border-radius:16px; padding:14px; margin-bottom:12px;
+  box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.inv-qr-body { display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:10px; }
+.inv-qr-img { border-radius:12px; border:1px solid #e5e7eb; background:#fff; }
+.inv-qr-meta { width:100%; }
+.inv-qr-hint { font-size:13px; color:#6b7280; margin:0 0 10px; line-height:1.4; }
+.inv-qr-url {
+  width:100%; font-size:12px; padding:10px 12px; border-radius:10px; border:1px solid #e5e7eb;
+  background:#f9fafb; color:#374151; margin-bottom:8px;
+}
+@media (min-width:768px) {
+  .inv-qr-body { flex-direction:row; align-items:flex-start; }
+  .inv-qr-meta { flex:1; }
+}
 @media (min-width:768px) {
   .inv-show { padding:8px 0 24px; }
   .inv-show-head, .inv-items, .inv-summary, .inv-notes { padding-left:18px; padding-right:18px; }
@@ -176,6 +206,13 @@ $id = (int)$invoice['id'];
 </style>
 
 <script>
+function copyPublicUrl() {
+  const el = document.getElementById('publicShareUrl');
+  if (!el) return;
+  el.select();
+  el.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(el.value).then(() => alert('Ссылка скопирована')).catch(() => {});
+}
 async function shareInvoice() {
   const res = await fetch('/api/invoices/<?= $id ?>/share');
   const data = await res.json();

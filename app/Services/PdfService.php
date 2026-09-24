@@ -9,7 +9,7 @@ use App\Core\Logger;
 
 class PdfService
 {
-    public function generate(array $invoice, array $items, array $company): void
+    public function generate(array $invoice, array $items, array $company, ?string $qrImageDataUri = null, ?string $qrPublicUrl = null): void
     {
         $options = new Options();
         $options->set('isRemoteEnabled', false);
@@ -17,7 +17,7 @@ class PdfService
         $options->set('chroot', ROOT_DIR);
 
         $dompdf = new Dompdf($options);
-        $html   = $this->buildHtml($invoice, $items, $company);
+        $html   = $this->buildHtml($invoice, $items, $company, $qrImageDataUri, $qrPublicUrl);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
@@ -57,7 +57,7 @@ class PdfService
         }
     }
 
-    private function buildHtml(array $invoice, array $items, array $company): string
+    private function buildHtml(array $invoice, array $items, array $company, ?string $qrImageDataUri = null, ?string $qrPublicUrl = null): string
     {
         $logo = '';
         if (!empty($company['logo_path'])) {
@@ -117,6 +117,18 @@ class PdfService
         };
 
         $notesHtml = htmlspecialchars((string)($invoice['notes'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        $qrBlock = '';
+        if ($qrImageDataUri) {
+            $qrCaption = htmlspecialchars((string)($qrPublicUrl ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $qrBlock = <<<QR
+  <div style="margin-top:16px; text-align:center; border:1px solid #e5e7eb; border-radius:8px; padding:12px; max-width:220px; float:right; margin-left:16px;">
+    <div style="font-size:11px; color:#555; margin-bottom:8px; font-weight:bold;">Сканируйте для просмотра</div>
+    <img src="{$qrImageDataUri}" alt="QR" style="width:140px;height:140px;display:block;margin:0 auto;">
+    <div style="font-size:8px; color:#9ca3af; margin-top:6px; word-break:break-all;">{$qrCaption}</div>
+  </div>
+QR;
+        }
 
         return <<<HTML
 <!DOCTYPE html>
@@ -200,6 +212,8 @@ class PdfService
     {$debt}
   </table>
   <div style="clear:both;"></div>
+
+  {$qrBlock}
 
   <div class="notes">
     {$notesHtml}

@@ -233,14 +233,7 @@ class Invoice
 
     public static function shareUrl(array $invoice): string
     {
-        $baseUrl = rtrim($_ENV['APP_URL'] ?? '', '/');
-        if ($baseUrl === '') {
-            return '/invoices/' . $invoice['id'];
-        }
-        if (!empty($invoice['pdf_path'])) {
-            return $baseUrl . '/invoices/' . $invoice['id'] . '/pdf';
-        }
-        return $baseUrl . '/invoices/' . $invoice['id'];
+        return InvoiceQrCode::publicUrlForInvoice($invoice);
     }
 
     private static function save(int $companyId, int $userId, array $data, ?int $invoiceId = null): array
