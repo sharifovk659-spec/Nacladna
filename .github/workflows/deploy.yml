@@ -25,13 +25,8 @@ jobs:
         run: |
           find app bin config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
 
-      - name: Run automated tests
-        run: |
-          if [ -f vendor/bin/phpunit ]; then
-            vendor/bin/phpunit --colors=never || true
-          fi
-        # Unit tests that require a local server/DB are non-blocking here;
-        # production health check is the deploy gate.
+      - name: Run CI unit tests
+        run: vendor/bin/phpunit --testsuite CI --colors=never
 
   deploy:
     needs: test
@@ -51,9 +46,12 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
           APP_DIR: ${{ secrets.APP_DIR }}
           PUBLIC_DIR: ${{ secrets.PUBLIC_DIR }}
           APP_URL: ${{ secrets.APP_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
@@ -65,6 +63,12 @@ jobs:
               missing=1
             fi
           done
+          if [ -z "${SSH_PORT}" ]; then
+            echo "WARNING: SSH_PORT not set, deploy step will default to 22"
+          fi
+          if [ -z "${DB_HOST}" ]; then
+            echo "WARNING: DB_HOST not set, mysqldump may use wrong host"
+          fi
           if [ "$missing" -ne 0 ]; then
             echo "Add required GitHub Secrets, then re-run this workflow."
             exit 1
@@ -222,6 +226,10 @@ jobs:
               fi
               exit 1
             fi
+
+            echo "=== MVP smoke tests ==="
+            php bin/smoke_mvp.php
+            php bin/smoke_invoice.php
 
             echo "=== Deploy successful ==="
             echo "Backup: $BACKUP_DIR"
