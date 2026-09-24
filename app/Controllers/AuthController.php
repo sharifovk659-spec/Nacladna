@@ -7,6 +7,7 @@ use App\Core\Logger;
 use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Models\User;
+use App\Models\Company;
 use App\Services\ActivityLogger;
 use App\Services\RateLimiter;
 use App\Middleware\SubscriptionMiddleware;

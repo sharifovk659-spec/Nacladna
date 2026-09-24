@@ -12,6 +12,7 @@ use App\Controllers\InvoiceController;
 use App\Controllers\DebtController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\ProfileController;
+use App\Controllers\SettingsController;
 use App\Controllers\Admin\AdminAuthController;
 use App\Controllers\Admin\AdminDashboardController;
 use App\Controllers\Admin\AdminCompanyController;
@@ -89,7 +90,10 @@ $router->post('/subscription/request',[SubscriptionController::class, 'request']
 // Profile
 $router->get('/profile',             [ProfileController::class, 'index']);
 $router->post('/profile',            [ProfileController::class, 'update']);
-$router->post('/profile/company',    [ProfileController::class, 'updateCompany']);
+$router->post('/profile/company',    [SettingsController::class, 'update']);
+
+$router->get('/settings',            [SettingsController::class, 'index']);
+$router->post('/settings',           [SettingsController::class, 'update']);
 
 // Admin
 $router->get('/admin',               [AdminAuthController::class, 'loginPage']);
