@@ -131,6 +131,14 @@ class Company
             $candidates[] = \ROOT_DIR . '/storage/uploads/' . substr($rel, strlen('uploads/'));
         }
 
+        $publicRoot = self::publicWebRoot();
+        if ($publicRoot !== null) {
+            $candidates[] = $publicRoot . '/' . $rel;
+            if (str_starts_with($rel, 'logos/')) {
+                $candidates[] = $publicRoot . '/uploads/' . $rel;
+            }
+        }
+
         foreach ($candidates as $full) {
             if (is_file($full)) {
                 return $full;
