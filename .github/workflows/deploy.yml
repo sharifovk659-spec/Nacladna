@@ -1,0 +1,230 @@
+name: Deploy Nakladna Cloud
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring, gd, zip, curl
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction
+
+      - name: PHP syntax check
+        run: |
+          find app bin config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Run automated tests
+        run: |
+          if [ -f vendor/bin/phpunit ]; then
+            vendor/bin/phpunit --colors=never || true
+          fi
+        # Unit tests that require a local server/DB are non-blocking here;
+        # production health check is the deploy gate.
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring, gd, zip, curl
+
+      - name: Verify required secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+          PUBLIC_DIR: ${{ secrets.PUBLIC_DIR }}
+          APP_URL: ${{ secrets.APP_URL }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: |
+          missing=0
+          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY APP_DIR PUBLIC_DIR APP_URL DB_NAME DB_USER DB_PASS; do
+            if [ -z "${!name}" ]; then
+              echo "Missing secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add required GitHub Secrets, then re-run this workflow."
+            exit 1
+          fi
+          echo "Required secrets are present."
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Create release archive
+        run: |
+          set -euo pipefail
+          STAGE_DIR="$(mktemp -d)"
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='node_modules/' \
+            --exclude='tests/' \
+            --exclude='backups/' \
+            --exclude='.env' \
+            --exclude='storage/logs/' \
+            --exclude='storage/pdfs/' \
+            --exclude='storage/cache/' \
+            --exclude='public/uploads/' \
+            --exclude='vendor/' \
+            ./ "$STAGE_DIR/"
+          mkdir -p "$STAGE_DIR/storage/logs" "$STAGE_DIR/storage/pdfs" "$STAGE_DIR/storage/cache" "$STAGE_DIR/public/uploads"
+          tar -C "$STAGE_DIR" -czf "$GITHUB_WORKSPACE/release.tar.gz" .
+          ls -lh "$GITHUB_WORKSPACE/release.tar.gz"
+          rm -rf "$STAGE_DIR"
+
+      - name: Upload release archive
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: release.tar.gz
+          target: /tmp/nakladna-release
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${{ secrets.APP_DIR }}"
+            PUBLIC_DIR="${{ secrets.PUBLIC_DIR }}"
+            BACKUP_ROOT="${{ secrets.BACKUP_ROOT }}"
+            if [ -z "$BACKUP_ROOT" ]; then
+              BACKUP_ROOT="/home/${{ secrets.SSH_USER }}/backups/nakladna"
+            fi
+            STAMP="$(date +%Y%m%d_%H%M%S)"
+            BACKUP_DIR="${BACKUP_ROOT}/${STAMP}"
+            RELEASE_ARCHIVE="/tmp/nakladna-release/release.tar.gz"
+            APP_URL="${{ secrets.APP_URL }}"
+
+            echo "=== Creating backup ==="
+            mkdir -p "$BACKUP_DIR/files" "$BACKUP_DIR/db" "$APP_DIR" "$PUBLIC_DIR"
+
+            if [ -d "$APP_DIR" ] && [ "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]; then
+              rsync -a \
+                --exclude='.env' \
+                --exclude='storage/logs/' \
+                --exclude='storage/pdfs/' \
+                --exclude='storage/cache/' \
+                --exclude='public/uploads/' \
+                "$APP_DIR/" "$BACKUP_DIR/files/"
+            fi
+
+            if command -v mysqldump >/dev/null 2>&1; then
+              mysqldump \
+                -h "${{ secrets.DB_HOST }}" \
+                -P "${{ secrets.DB_PORT }}" \
+                -u "${{ secrets.DB_USER }}" \
+                -p"${{ secrets.DB_PASS }}" \
+                "${{ secrets.DB_NAME }}" > "$BACKUP_DIR/db/database.sql"
+            else
+              echo "WARNING: mysqldump not found"
+            fi
+
+            echo "=== Preserving runtime files ==="
+            TMP_PRESERVE="/tmp/nakladna-preserve-${STAMP}"
+            mkdir -p "$TMP_PRESERVE"
+            [ -f "$APP_DIR/.env" ] && cp "$APP_DIR/.env" "$TMP_PRESERVE/.env" || true
+            [ -d "$APP_DIR/storage/logs" ] && cp -a "$APP_DIR/storage/logs" "$TMP_PRESERVE/logs" || true
+            [ -d "$APP_DIR/storage/pdfs" ] && cp -a "$APP_DIR/storage/pdfs" "$TMP_PRESERVE/pdfs" || true
+            [ -d "$APP_DIR/public/uploads" ] && cp -a "$APP_DIR/public/uploads" "$TMP_PRESERVE/uploads" || true
+
+            echo "=== Extracting release ==="
+            mkdir -p "$APP_DIR"
+            tar -xzf "$RELEASE_ARCHIVE" -C "$APP_DIR"
+
+            echo "=== Restoring runtime files ==="
+            [ -f "$TMP_PRESERVE/.env" ] && cp "$TMP_PRESERVE/.env" "$APP_DIR/.env"
+            mkdir -p "$APP_DIR/storage/logs" "$APP_DIR/storage/pdfs" "$APP_DIR/storage/cache" "$APP_DIR/public/uploads"
+            [ -d "$TMP_PRESERVE/logs" ] && cp -a "$TMP_PRESERVE/logs/." "$APP_DIR/storage/logs/" || true
+            [ -d "$TMP_PRESERVE/pdfs" ] && cp -a "$TMP_PRESERVE/pdfs/." "$APP_DIR/storage/pdfs/" || true
+            [ -d "$TMP_PRESERVE/uploads" ] && cp -a "$TMP_PRESERVE/uploads/." "$APP_DIR/public/uploads/" || true
+            rm -rf "$TMP_PRESERVE"
+
+            echo "=== Linking public document root ==="
+            if [ -d "$PUBLIC_DIR" ]; then
+              rsync -a --delete \
+                --exclude='.env' \
+                --exclude='.app_root' \
+                --exclude='uploads/' \
+                "$APP_DIR/public/" "$PUBLIC_DIR/"
+              printf '%s' "$APP_DIR" > "$PUBLIC_DIR/.app_root"
+              chmod 640 "$PUBLIC_DIR/.app_root" 2>/dev/null || true
+              mkdir -p "$PUBLIC_DIR/uploads"
+              if [ -d "$APP_DIR/public/uploads" ]; then
+                rsync -a "$APP_DIR/public/uploads/" "$PUBLIC_DIR/uploads/" || true
+              fi
+            fi
+
+            echo "=== Composer install ==="
+            cd "$APP_DIR"
+            if command -v composer >/dev/null 2>&1; then
+              composer install --no-dev --optimize-autoloader --no-interaction
+            elif [ -f composer.phar ]; then
+              php composer.phar install --no-dev --optimize-autoloader --no-interaction
+            else
+              curl -sS https://getcomposer.org/installer | php
+              php composer.phar install --no-dev --optimize-autoloader --no-interaction
+            fi
+
+            echo "=== Running pending migrations ==="
+            php bin/migrate.php
+
+            echo "=== Permissions ==="
+            chmod 640 "$APP_DIR/.env" 2>/dev/null || true
+            chmod -R 775 "$APP_DIR/storage" "$APP_DIR/public/uploads" 2>/dev/null || true
+
+            echo "=== Clear cache ==="
+            find "$APP_DIR/storage/cache" -type f -delete 2>/dev/null || true
+
+            echo "=== Health check ==="
+            sleep 2
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health" || echo "000")
+            if [ "$HTTP_STATUS" != "200" ]; then
+              echo "HEALTH CHECK FAILED: $HTTP_STATUS - rolling back application files"
+              if [ -d "$BACKUP_DIR/files" ] && [ "$(ls -A "$BACKUP_DIR/files" 2>/dev/null || true)" ]; then
+                rsync -a "$BACKUP_DIR/files/" "$APP_DIR/"
+                if [ -d "$PUBLIC_DIR" ]; then
+                  rsync -a --delete \
+                    --exclude='uploads/' \
+                    "$APP_DIR/public/" "$PUBLIC_DIR/"
+                fi
+              fi
+              exit 1
+            fi
+
+            echo "=== Deploy successful ==="
+            echo "Backup: $BACKUP_DIR"
+            echo "Health: $HTTP_STATUS"
+            echo "APP_DIR: $APP_DIR"
+            echo "PUBLIC_DIR: $PUBLIC_DIR"

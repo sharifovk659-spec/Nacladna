@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS `companies` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(200) NOT NULL,
+  `owner_name` VARCHAR(200) NOT NULL,
+  `phone` VARCHAR(30) NULL,
+  `address` TEXT NULL,
+  `logo_path` VARCHAR(512) NULL,
+  `currency` VARCHAR(10) NOT NULL DEFAULT 'TJS',
+  `timezone` VARCHAR(60) NOT NULL DEFAULT 'Asia/Dushanbe',
+  `invoice_prefix` VARCHAR(20) NOT NULL DEFAULT 'INV',
+  `next_invoice_number` INT UNSIGNED NOT NULL DEFAULT 1,
+  `status` ENUM('active','suspended') NOT NULL DEFAULT 'active',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

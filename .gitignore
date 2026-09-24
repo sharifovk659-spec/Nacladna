@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+
+# Dependencies
+vendor/
+node_modules/
+
+# Runtime / generated
+storage/logs/*
+!storage/logs/.gitkeep
+storage/pdfs/*
+!storage/pdfs/.gitkeep
+storage/cache/*
+!storage/cache/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep
+backups/
+*.sql
+!database/migrations/*.sql
+*.zip
+*.tar.gz
+release.tar.gz
+
+# Composer installer leftovers
+composer
+composer.phar
+composer-setup.php
+
+# Tests / IDE
+.phpunit.result.cache
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local deploy helpers / secrets
+bin/set-github-secrets.ps1
+bin/remote-deploy.sh
+.env.production.local
