@@ -124,11 +124,11 @@ class Company
 
         $candidates = [];
         if (str_starts_with($rel, 'logos/')) {
-            $candidates[] = ROOT_DIR . '/storage/uploads/' . $rel;
+            $candidates[] = \ROOT_DIR . '/storage/uploads/' . $rel;
         }
-        $candidates[] = ROOT_DIR . '/public/' . $rel;
+        $candidates[] = \ROOT_DIR . '/public/' . $rel;
         if (str_starts_with($rel, 'uploads/logos/')) {
-            $candidates[] = ROOT_DIR . '/storage/uploads/' . substr($rel, strlen('uploads/'));
+            $candidates[] = \ROOT_DIR . '/storage/uploads/' . substr($rel, strlen('uploads/'));
         }
 
         foreach ($candidates as $full) {
@@ -205,7 +205,7 @@ class Company
             default => throw new \RuntimeException('Недопустимый формат.'),
         };
 
-        $dir = ROOT_DIR . '/storage/uploads/logos/' . $companyId;
+        $dir = \ROOT_DIR . '/storage/uploads/logos/' . $companyId;
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
@@ -262,7 +262,7 @@ class Company
             default => pathinfo($full, PATHINFO_EXTENSION) ?: 'png',
         };
 
-        $dir = ROOT_DIR . '/storage/uploads/logos/' . $companyId;
+        $dir = \ROOT_DIR . '/storage/uploads/logos/' . $companyId;
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }

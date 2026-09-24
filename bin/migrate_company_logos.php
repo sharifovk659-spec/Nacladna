@@ -4,6 +4,9 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+if (!defined('ROOT_DIR')) {
+    define('ROOT_DIR', $root);
+}
 require $root . '/vendor/autoload.php';
 
 if (class_exists(\Dotenv\Dotenv::class) && is_file($root . '/.env')) {
