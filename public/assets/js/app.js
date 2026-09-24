@@ -8,10 +8,12 @@
   if (!btn || !sidebar) return;
   btn.addEventListener('click', () => {
     sidebar.classList.toggle('open');
+    document.body.classList.toggle('sidebar-open', sidebar.classList.contains('open'));
   });
   document.addEventListener('click', (e) => {
     if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && e.target !== btn) {
       sidebar.classList.remove('open');
+      document.body.classList.remove('sidebar-open');
     }
   });
 })();

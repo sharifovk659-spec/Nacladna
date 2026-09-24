@@ -1,5 +1,8 @@
 <div class="auth-page">
   <div class="auth-box">
+    <?php if (!empty($flashError)): ?>
+      <div class="alert alert-error" style="margin-bottom:12px;text-align:left;"><?= htmlspecialchars((string)$flashError) ?></div>
+    <?php endif; ?>
     <div style="font-size:64px; margin-bottom:16px;">🔒</div>
     <h1 class="auth-title">Подписка истекла</h1>
     <p class="auth-sub">Ваш пробный период или подписка завершились. Данные сохранены.</p>

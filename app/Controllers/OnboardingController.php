@@ -7,6 +7,7 @@ use App\Core\Response;
 use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\SubscriptionMiddleware;
 use App\Services\ActivityLogger;
 use App\Services\RateLimiter;
 
@@ -128,7 +129,12 @@ class OnboardingController
             $_SESSION['company_id'] = $companyId;
             $_SESSION['company_name'] = $name;
             $_SESSION['company_role'] = 'owner';
-            $_SESSION['sub_status'] = 'active';
+            SubscriptionMiddleware::syncSessionStatus([
+                'plan' => 'trial',
+                'status' => 'active',
+                'trial_end' => $trialEnd,
+                'ends_at' => $trialEnd,
+            ]);
             $_SESSION['trial_end'] = $trialEnd;
 
             Response::redirect('/onboarding/success');

@@ -8,6 +8,7 @@ use App\Helpers\Csrf;
 use App\Helpers\Validator;
 use App\Middleware\CompanyMiddleware;
 use App\Middleware\OwnerMiddleware;
+use App\Middleware\SubscriptionMiddleware;
 use App\Services\ActivityLogger;
 
 class ProfileController
@@ -46,6 +47,7 @@ class ProfileController
     public function update(): void
     {
         CompanyMiddleware::check();
+        SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
         $db     = Database::getInstance();
@@ -65,6 +67,7 @@ class ProfileController
     public function updateCompany(): void
     {
         OwnerMiddleware::check();
+        SubscriptionMiddleware::requireWrite();
         Csrf::verifyRequest();
 
         $companyId = CompanyMiddleware::companyId();

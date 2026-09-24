@@ -39,6 +39,8 @@ class SubscriptionController
         $pageTitle    = 'Подписка истекла';
         $hideNav      = true;
         $hideBottomNav = true;
+        $flashError = $_SESSION['flash_error'] ?? null;
+        unset($_SESSION['flash_error']);
         ob_start();
         require ROOT_DIR . '/views/subscriptions/expired.php';
         $content = ob_get_clean();

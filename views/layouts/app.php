@@ -15,9 +15,23 @@
   try {
     tg.ready();
     tg.expand();
+    if (typeof tg.disableVerticalSwipes === 'function') {
+      tg.disableVerticalSwipes();
+    }
+    document.documentElement.classList.add('tg-webapp');
+    document.body.classList.add('tg-webapp');
     var tp = tg.themeParams || {};
-    if (tp.bg_color) document.documentElement.style.setProperty('--tg-bg', tp.bg_color);
-    document.documentElement.style.setProperty('--safe-top', (tg.safeAreaInset && tg.safeAreaInset.top || 0) + 'px');
+    if (tp.bg_color) {
+      document.documentElement.style.setProperty('--tg-bg', tp.bg_color);
+      document.body.style.background = tp.bg_color;
+    }
+    var safeTop = (tg.safeAreaInset && tg.safeAreaInset.top) || 0;
+    var safeBottom = (tg.safeAreaInset && tg.safeAreaInset.bottom) || 0;
+    document.documentElement.style.setProperty('--safe-top', safeTop + 'px');
+    document.documentElement.style.setProperty('--safe-bottom', safeBottom + 'px');
+    if (typeof tg.setHeaderColor === 'function') {
+      tg.setHeaderColor(tp.bg_color || '#ffffff');
+    }
   } catch (e) {}
 })();
 </script>

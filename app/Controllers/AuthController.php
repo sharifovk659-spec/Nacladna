@@ -9,6 +9,7 @@ use App\Helpers\Csrf;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\RateLimiter;
+use App\Middleware\SubscriptionMiddleware;
 use App\Services\TelegramAuth;
 
 class AuthController
@@ -19,6 +20,8 @@ class AuthController
         $hideNav = true;
         $hideHeader = true;
         $hideBottomNav = true;
+        $bodyClass = 'mini-app-shell';
+        $botUsername = ltrim(trim($_ENV['TELEGRAM_BOT_USERNAME'] ?? ''), '@');
         ob_start();
         require ROOT_DIR . '/views/auth/mini-app.php';
         $content = ob_get_clean();
@@ -98,7 +101,7 @@ class AuthController
             $_SESSION['company_name'] = $company['name'];
             $_SESSION['company_role'] = $company['role'];
             $sub = $this->getSubscription((int)$company['id']);
-            $_SESSION['sub_status'] = $sub['status'] ?? 'expired';
+            SubscriptionMiddleware::syncSessionStatus($sub);
         }
 
         Response::json([
@@ -187,7 +190,7 @@ class AuthController
             $_SESSION['company_name'] = $company['name'];
             $_SESSION['company_role'] = $company['role'];
             $sub = $this->getSubscription((int)$company['id']);
-            $_SESSION['sub_status'] = $sub['status'] ?? 'expired';
+            SubscriptionMiddleware::syncSessionStatus($sub);
         }
 
         Csrf::token();
