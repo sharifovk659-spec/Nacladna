@@ -28,12 +28,19 @@ Optional: `BACKUP_ROOT` (defaults to `/home/<SSH_USER>/backups/nakladna`)
 
 ## Set secrets (maintainer machine)
 
+1. `gh auth login` (or set `GH_TOKEN` with `repo` scope)
+2. Set DB password: `$env:NAK_DB_PASS = '<production-db-password>'`
+3. Run:
+
 ```powershell
-$env:NAK_DB_PASS = '<production-db-password>'
 powershell -File bin/set-github-secrets.ps1
 ```
 
-Requires: `gh auth login`, deploy key at `%USERPROFILE%\.ssh\nakladna_deploy`
+Uses `%USERPROFILE%\.ssh\nakladna_deploy`, or falls back to `id_ed25519`.
+
+4. Re-run deploy: **Actions → Deploy Nakladna Cloud → Run workflow**
+
+Or push to `main` / `master` after secrets exist.
 
 ## CI pipeline
 
