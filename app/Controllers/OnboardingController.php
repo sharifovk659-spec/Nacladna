@@ -9,6 +9,7 @@ use App\Helpers\Validator;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\SubscriptionMiddleware;
 use App\Models\Subscription;
+use App\Models\Company;
 use App\Services\ActivityLogger;
 use App\Services\RateLimiter;
 
@@ -70,13 +71,10 @@ class OnboardingController
 
         $logoPath = null;
         if (!empty($_FILES['logo']['name'])) {
-            $upload = $this->handleLogoUpload($_FILES['logo']);
-            if ($upload['error']) {
-                $_SESSION['onboarding_error'] = $upload['error'];
-                $_SESSION['onboarding_old'] = $_POST;
-                Response::redirect('/onboarding');
-            }
-            $logoPath = $upload['path'];
+            // Stored after company row exists (needs company id).
+            $pendingLogo = $_FILES['logo'];
+        } else {
+            $pendingLogo = null;
         }
 
         $name = trim((string)$_POST['name']);
@@ -106,9 +104,19 @@ class OnboardingController
             $db->prepare(
                 "INSERT INTO companies (name, owner_name, phone, address, logo_path, currency, timezone, invoice_prefix, next_invoice_number, status)
                  VALUES (?, ?, ?, ?, ?, 'TJS', 'Asia/Dushanbe', 'NK', 1, 'active')"
-            )->execute([$name, $ownerName, $phone, $address !== '' ? $address : null, $logoPath]);
+            )->execute([$name, $ownerName, $phone, $address !== '' ? $address : null, null]);
 
             $companyId = (int)$db->lastInsertId();
+
+            if ($pendingLogo !== null) {
+                try {
+                    $logoPath = Company::storeLogoUpload($pendingLogo, $companyId);
+                    $db->prepare('UPDATE companies SET logo_path = ? WHERE id = ?')
+                        ->execute([$logoPath, $companyId]);
+                } catch (\Throwable $logoErr) {
+                    throw new \RuntimeException($logoErr->getMessage(), 0, $logoErr);
+                }
+            }
 
             $db->prepare(
                 "INSERT INTO company_users (company_id, user_id, role, status) VALUES (?, ?, 'owner', 'active')"
@@ -141,11 +149,10 @@ class OnboardingController
             if ($db->inTransaction()) {
                 $db->rollBack();
             }
-            if ($logoPath && is_file(ROOT_DIR . '/public/' . $logoPath)) {
-                @unlink(ROOT_DIR . '/public/' . $logoPath);
-            }
             \App\Core\Logger::error('Onboarding failed: ' . $e->getMessage());
-            $_SESSION['onboarding_error'] = 'Произошла ошибка. Попробуйте ещё раз.';
+            $_SESSION['onboarding_error'] = $e instanceof \RuntimeException
+                ? $e->getMessage()
+                : 'Произошла ошибка. Попробуйте ещё раз.';
             $_SESSION['onboarding_old'] = $_POST;
             Response::redirect('/onboarding');
         }
@@ -177,42 +184,5 @@ class OnboardingController
         require ROOT_DIR . '/views/onboarding/success.php';
         $content = ob_get_clean();
         require ROOT_DIR . '/views/layouts/app.php';
-    }
-
-    private function handleLogoUpload(array $file): array
-    {
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            return ['error' => 'Ошибка загрузки файла.', 'path' => null];
-        }
-
-        if ($file['size'] > 2 * 1024 * 1024) {
-            return ['error' => 'Файл слишком большой (макс. 2MB).', 'path' => null];
-        }
-
-        $allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->file($file['tmp_name']);
-        if (!in_array($mimeType, $allowed, true)) {
-            return ['error' => 'Недопустимый тип файла. Только JPEG, PNG, WebP.', 'path' => null];
-        }
-
-        $ext = match ($mimeType) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-        };
-
-        $dir = ROOT_DIR . '/public/uploads/logos';
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
-        $dest = $dir . '/' . $filename;
-        if (!move_uploaded_file($file['tmp_name'], $dest)) {
-            return ['error' => 'Не удалось сохранить файл.', 'path' => null];
-        }
-
-        return ['error' => null, 'path' => 'uploads/logos/' . $filename];
     }
 }

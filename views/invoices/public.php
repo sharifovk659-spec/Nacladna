@@ -9,10 +9,15 @@
 ?>
 <div class="public-invoice">
   <div class="card public-hero">
-    <div class="card-row">
-      <div>
+    <div class="card-row public-hero-top">
+      <div class="public-hero-brand">
+        <?php if (!empty($companyLogoUrl)): ?>
+          <img src="<?= htmlspecialchars($companyLogoUrl) ?>" alt="" class="public-company-logo">
+        <?php endif; ?>
+        <div>
         <div class="public-brand"><?= htmlspecialchars((string)($company['name'] ?? 'Nakladna Cloud')) ?></div>
         <div class="muted"><?= htmlspecialchars((string)($company['phone'] ?? '')) ?></div>
+        </div>
       </div>
       <span class="badge <?= $badge ?>"><?= htmlspecialchars($label) ?></span>
     </div>
@@ -90,7 +95,9 @@
 
 <style>
 .public-invoice { max-width: 760px; margin: 0 auto; padding: 12px 0 24px; }
-.public-hero { background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 70%); }
+.public-hero-top { align-items:flex-start; }
+.public-hero-brand { display:flex; align-items:center; gap:12px; }
+.public-company-logo { width:48px; height:48px; object-fit:contain; border-radius:8px; background:#fff; border:1px solid #e5e7eb; }
 .public-brand { font-size: 14px; font-weight: 700; color: #16a34a; }
 .public-title { font-size: 24px; margin-top: 12px; color: #111827; }
 .muted { color: #6b7280; font-size: 13px; }

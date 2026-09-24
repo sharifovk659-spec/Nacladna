@@ -34,7 +34,7 @@ class SettingsController
         $currencies = Company::CURRENCIES;
         $languages = Company::LANGUAGES;
         $timezones = Company::TIMEZONES;
-        $logoUrl = Company::logoPublicUrl($company['logo_path'] ?? null);
+        $logoUrl = Company::logoPublicUrl($company['logo_path'] ?? null, $companyId);
 
         ob_start();
         require ROOT_DIR . '/views/settings/index.php';

@@ -13,6 +13,7 @@ use App\Controllers\DebtController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\ProfileController;
 use App\Controllers\SettingsController;
+use App\Controllers\MediaController;
 use App\Controllers\Admin\AdminAuthController;
 use App\Controllers\Admin\AdminDashboardController;
 use App\Controllers\Admin\AdminCompanyController;
@@ -22,6 +23,9 @@ use App\Controllers\TelegramBotController;
 
 // Health
 $router->get('/health', [HealthController::class, 'index']);
+
+// Public company logos (served from app storage; safe HTTPS URL)
+$router->get('/media/company-logo/{companyId}', [MediaController::class, 'companyLogo']);
 
 // Public invoice QR view (no auth)
 $router->get('/invoice/public/{uuid}', [InvoiceController::class, 'publicShow']);

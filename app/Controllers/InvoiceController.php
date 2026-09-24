@@ -138,6 +138,11 @@ class InvoiceController
 
         $items = Invoice::getItems((int)$id);
         $payments = Invoice::getPayments((int)$id);
+        $db = Database::getInstance();
+        $companySt = $db->prepare('SELECT * FROM companies WHERE id = ? LIMIT 1');
+        $companySt->execute([$companyId]);
+        $company = $companySt->fetch() ?: [];
+        $companyLogoUrl = \App\Models\Company::logoPublicUrl($company['logo_path'] ?? null, $companyId);
         $qr = InvoiceQrCode::syncForInvoice((int)$id, $companyId);
         $qrImageDataUri = $qr
             ? InvoiceQrCode::imageDataUri($qr['qr_image_path'] ?? null, (string)$qr['public_url'])
@@ -203,6 +208,8 @@ class InvoiceController
             'client_name' => $public['client_name'],
             'client_phone' => $public['client_phone'],
         ];
+        $companyId = (int)($public['company_id'] ?? 0);
+        $companyLogoUrl = \App\Models\Company::logoPublicUrl($public['company_logo_path'] ?? null, $companyId);
         $company = [
             'name' => $public['company_name'],
             'phone' => $public['company_phone'],

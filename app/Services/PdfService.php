@@ -60,13 +60,9 @@ class PdfService
     private function buildHtml(array $invoice, array $items, array $company, ?string $qrImageDataUri = null, ?string $qrPublicUrl = null): string
     {
         $logo = '';
-        if (!empty($company['logo_path'])) {
-            $logoFile = ROOT_DIR . '/public/' . $company['logo_path'];
-            if (file_exists($logoFile)) {
-                $ext  = pathinfo($logoFile, PATHINFO_EXTENSION);
-                $b64  = base64_encode(file_get_contents($logoFile));
-                $logo = "<img src=\"data:image/{$ext};base64,{$b64}\" style=\"height:50px; margin-bottom:8px;\">";
-            }
+        $logoDataUri = \App\Models\Company::logoDataUri($company['logo_path'] ?? null);
+        if ($logoDataUri !== null) {
+            $logo = '<img src="' . htmlspecialchars($logoDataUri, ENT_QUOTES, 'UTF-8') . '" style="height:50px; margin-bottom:8px;">';
         }
 
         $itemRows = '';

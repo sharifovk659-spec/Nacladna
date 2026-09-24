@@ -28,6 +28,11 @@ $id = (int)$invoice['id'];
 <?php if ($error): ?><div class="alert alert-error" data-autohide><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="inv-show">
+  <?php if (!empty($companyLogoUrl)): ?>
+  <div class="inv-show-logo">
+    <img src="<?= htmlspecialchars($companyLogoUrl) ?>" alt="" class="inv-company-logo">
+  </div>
+  <?php endif; ?>
   <div class="inv-show-head">
     <div class="inv-show-title-row">
       <a href="/invoices" class="inv-back" aria-label="Назад">←</a>
@@ -133,6 +138,8 @@ $id = (int)$invoice['id'];
 
 <style>
 .inv-show { max-width:720px; margin:0 auto; }
+.inv-show-logo { padding:12px 14px 0; text-align:center; }
+.inv-company-logo { max-height:56px; max-width:200px; object-fit:contain; }
 .inv-show-head { background:#fff; border-radius:16px; padding:14px 14px 16px; box-shadow:0 1px 4px rgba(0,0,0,.05); margin-bottom:12px; }
 .inv-show-title-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:16px; }
 .inv-back {

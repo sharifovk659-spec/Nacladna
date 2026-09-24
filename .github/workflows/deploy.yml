@@ -92,10 +92,11 @@ jobs:
             --exclude='storage/logs/' \
             --exclude='storage/pdfs/' \
             --exclude='storage/cache/' \
+            --exclude='storage/uploads/' \
             --exclude='public/uploads/' \
             --exclude='vendor/' \
             ./ "$STAGE_DIR/"
-          mkdir -p "$STAGE_DIR/storage/logs" "$STAGE_DIR/storage/pdfs" "$STAGE_DIR/storage/cache" "$STAGE_DIR/public/uploads"
+          mkdir -p "$STAGE_DIR/storage/logs" "$STAGE_DIR/storage/pdfs" "$STAGE_DIR/storage/cache" "$STAGE_DIR/storage/uploads" "$STAGE_DIR/public/uploads"
           tar -C "$STAGE_DIR" -czf "$GITHUB_WORKSPACE/release.tar.gz" .
           ls -lh "$GITHUB_WORKSPACE/release.tar.gz"
           rm -rf "$STAGE_DIR"
@@ -140,6 +141,7 @@ jobs:
                 --exclude='storage/logs/' \
                 --exclude='storage/pdfs/' \
                 --exclude='storage/cache/' \
+                --exclude='storage/uploads/' \
                 --exclude='public/uploads/' \
                 "$APP_DIR/" "$BACKUP_DIR/files/"
             fi
@@ -161,6 +163,7 @@ jobs:
             [ -f "$APP_DIR/.env" ] && cp "$APP_DIR/.env" "$TMP_PRESERVE/.env" || true
             [ -d "$APP_DIR/storage/logs" ] && cp -a "$APP_DIR/storage/logs" "$TMP_PRESERVE/logs" || true
             [ -d "$APP_DIR/storage/pdfs" ] && cp -a "$APP_DIR/storage/pdfs" "$TMP_PRESERVE/pdfs" || true
+            [ -d "$APP_DIR/storage/uploads" ] && cp -a "$APP_DIR/storage/uploads" "$TMP_PRESERVE/storage_uploads" || true
             [ -d "$APP_DIR/public/uploads" ] && cp -a "$APP_DIR/public/uploads" "$TMP_PRESERVE/uploads" || true
 
             echo "=== Extracting release ==="
@@ -169,9 +172,10 @@ jobs:
 
             echo "=== Restoring runtime files ==="
             [ -f "$TMP_PRESERVE/.env" ] && cp "$TMP_PRESERVE/.env" "$APP_DIR/.env"
-            mkdir -p "$APP_DIR/storage/logs" "$APP_DIR/storage/pdfs" "$APP_DIR/storage/cache" "$APP_DIR/public/uploads"
+            mkdir -p "$APP_DIR/storage/logs" "$APP_DIR/storage/pdfs" "$APP_DIR/storage/cache" "$APP_DIR/storage/uploads" "$APP_DIR/public/uploads"
             [ -d "$TMP_PRESERVE/logs" ] && cp -a "$TMP_PRESERVE/logs/." "$APP_DIR/storage/logs/" || true
             [ -d "$TMP_PRESERVE/pdfs" ] && cp -a "$TMP_PRESERVE/pdfs/." "$APP_DIR/storage/pdfs/" || true
+            [ -d "$TMP_PRESERVE/storage_uploads" ] && cp -a "$TMP_PRESERVE/storage_uploads/." "$APP_DIR/storage/uploads/" || true
             [ -d "$TMP_PRESERVE/uploads" ] && cp -a "$TMP_PRESERVE/uploads/." "$APP_DIR/public/uploads/" || true
             rm -rf "$TMP_PRESERVE"
 
@@ -232,6 +236,7 @@ jobs:
             php bin/smoke_invoice.php
             php bin/smoke_subscription.php
             php bin/smoke_settings.php
+            php bin/smoke_logo.php
 
             echo "=== Deploy successful ==="
             echo "Backup: $BACKUP_DIR"

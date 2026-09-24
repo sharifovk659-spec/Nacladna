@@ -105,7 +105,8 @@ class InvoiceQrCode
                     i.id AS invoice_id, i.invoice_number, i.invoice_date,
                     i.subtotal, i.discount, i.total, i.paid_amount, i.debt_amount,
                     i.status, i.payment_status, i.notes,
-                    c.name AS company_name, c.phone AS company_phone,
+                    q.company_id AS company_id,
+                    c.name AS company_name, c.phone AS company_phone, c.logo_path AS company_logo_path,
                     cl.name AS client_name, cl.phone AS client_phone
              FROM invoice_qr_codes q
              INNER JOIN invoices i ON i.id = q.invoice_id AND i.company_id = q.company_id
