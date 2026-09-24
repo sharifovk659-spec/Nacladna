@@ -16,6 +16,10 @@ try {
     $db = Database::getInstance();
     $db->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'subscription_history' LIMIT 1")->fetch();
     ok('Migration subscription_history', true);
+    $db->query("SHOW COLUMNS FROM subscription_history LIKE 'price_som'")->fetch();
+    ok('Migration price_som column', true);
+    $t = Subscription::tariffs();
+    ok('Tariffs 12m price', isset($t[12]) && (float)$t[12]['price'] === 900.0);
 } catch (Throwable $e) {
     ok('Migration subscription_history', false, $e->getMessage());
     echo "\nRESULT: FAIL\n";

@@ -33,7 +33,7 @@ class Subscription
         $db = Database::getInstance();
         $limit = max(1, min(100, $limit));
         $st = $db->prepare(
-            "SELECT id, action, plan, period_months, starts_at, ends_at, status, actor_type, notes, created_at
+            "SELECT id, action, plan, period_months, price_som, starts_at, ends_at, status, actor_type, notes, created_at
              FROM subscription_history
              WHERE company_id = ?
              ORDER BY id DESC
@@ -77,6 +77,7 @@ class Subscription
             (int)$sub['id'],
             'trial_started',
             self::PLAN_TRIAL,
+            null,
             null,
             $now,
             $trialEnd,
@@ -132,12 +133,14 @@ class Subscription
         $db->prepare("UPDATE companies SET status = 'active' WHERE id = ?")->execute([$companyId]);
 
         $updated = self::findForCompany($companyId);
+        $tariff = self::tariffForMonths($periodMonths);
         self::logHistory(
             $companyId,
             (int)($updated['id'] ?? 0),
             'activated',
             self::PLAN_BUSINESS,
             $periodMonths,
+            $tariff ? (float)$tariff['price'] : null,
             $now,
             $ends,
             'active',
@@ -183,12 +186,14 @@ class Subscription
         ]);
 
         $updated = self::findForCompany($companyId);
+        $tariff = self::tariffForMonths($periodMonths);
         self::logHistory(
             $companyId,
             (int)($updated['id'] ?? 0),
             'extended',
             self::PLAN_BUSINESS,
             $periodMonths,
+            $tariff ? (float)$tariff['price'] : null,
             (string)($updated['starts_at'] ?? $base),
             $newEnd,
             'active',
@@ -222,6 +227,7 @@ class Subscription
             'expired',
             (string)($sub['plan'] ?? self::PLAN_TRIAL),
             isset($sub['period_months']) ? (int)$sub['period_months'] : null,
+            null,
             (string)($sub['starts_at'] ?? ''),
             (string)($sub['ends_at'] ?? $sub['trial_end'] ?? ''),
             'expired',
@@ -292,14 +298,97 @@ class Subscription
         return 'Business';
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public static function tariffs(): array
+    {
+        $baseFeatures = [
+            'Накладные без лимита',
+            'Клиенты и товары',
+            'Долги',
+            'PDF / Print / Share',
+            'QR-код',
+            '1 компания',
+        ];
+
+        return [
+            1 => [
+                'months' => 1,
+                'label' => '1 месяц',
+                'price' => 100.0,
+                'price_label' => '100 с.',
+                'full_price' => 100.0,
+                'savings' => 0.0,
+                'savings_label' => null,
+                'discount_percent' => null,
+                'badge' => null,
+                'includes_note' => null,
+                'features' => $baseFeatures,
+            ],
+            3 => [
+                'months' => 3,
+                'label' => '3 месяца',
+                'price' => 270.0,
+                'price_label' => '270 с.',
+                'full_price' => 300.0,
+                'savings' => 30.0,
+                'savings_label' => '−30 с.',
+                'discount_percent' => 10,
+                'badge' => null,
+                'includes_note' => 'Все возможности 1 месяца',
+                'features' => $baseFeatures,
+            ],
+            6 => [
+                'months' => 6,
+                'label' => '6 месяцев',
+                'price' => 500.0,
+                'price_label' => '500 с.',
+                'full_price' => 600.0,
+                'savings' => 100.0,
+                'savings_label' => '−100 с.',
+                'discount_percent' => 17,
+                'badge' => null,
+                'includes_note' => 'Все возможности',
+                'features' => $baseFeatures,
+            ],
+            12 => [
+                'months' => 12,
+                'label' => '12 месяцев',
+                'price' => 900.0,
+                'price_label' => '900 с.',
+                'full_price' => 1200.0,
+                'savings' => 300.0,
+                'savings_label' => '−300 с.',
+                'discount_percent' => 25,
+                'badge' => 'Выгодно',
+                'includes_note' => 'Все возможности',
+                'features' => $baseFeatures,
+            ],
+        ];
+    }
+
+    public static function tariffForMonths(int $months): ?array
+    {
+        $all = self::tariffs();
+        return $all[$months] ?? null;
+    }
+
+    public static function formatPriceSom(float $amount): string
+    {
+        return rtrim(rtrim(number_format($amount, 2, '.', ' '), '0'), '.') . ' с.';
+    }
+
     public static function periodOptions(): array
     {
-        return [
-            1 => ['months' => 1, 'label' => '1 месяц', 'price' => '100 с.'],
-            3 => ['months' => 3, 'label' => '3 месяца', 'price' => '270 с.'],
-            6 => ['months' => 6, 'label' => '6 месяцев', 'price' => '500 с.'],
-            12 => ['months' => 12, 'label' => '12 месяцев', 'price' => '900 с.'],
-        ];
+        $out = [];
+        foreach (self::tariffs() as $months => $t) {
+            $out[$months] = [
+                'months' => (int)$months,
+                'label' => (string)$t['label'],
+                'price' => (string)$t['price_label'],
+                'price_amount' => (float)$t['price'],
+            ];
+        }
+        return $out;
     }
 
     public static function actionLabel(string $action): string
@@ -357,6 +446,7 @@ class Subscription
         string $action,
         string $plan,
         ?int $periodMonths,
+        ?float $priceSom,
         ?string $startsAt,
         ?string $endsAt,
         string $status,
@@ -367,14 +457,15 @@ class Subscription
         $db = Database::getInstance();
         $db->prepare(
             "INSERT INTO subscription_history
-             (company_id, subscription_id, action, plan, period_months, starts_at, ends_at, status, actor_type, actor_id, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             (company_id, subscription_id, action, plan, period_months, price_som, starts_at, ends_at, status, actor_type, actor_id, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $companyId,
             $subscriptionId,
             $action,
             $plan,
             $periodMonths,
+            $priceSom,
             $startsAt,
             $endsAt,
             $status,

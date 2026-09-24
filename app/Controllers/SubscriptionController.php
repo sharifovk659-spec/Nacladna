@@ -25,6 +25,8 @@ class SubscriptionController
         $daysLeft = Subscription::daysRemaining($subscription);
         $history = Subscription::historyForCompany($companyId, 20);
         $periodOptions = Subscription::periodOptions();
+        $tariffs = Subscription::tariffs();
+        $defaultMonths = 12;
         $planLabel = Subscription::planLabel($subscription);
         $readOnly = !Subscription::isWritable($subscription);
 
@@ -65,6 +67,12 @@ class SubscriptionController
             $months = 1;
         }
 
+        $tariff = Subscription::tariffForMonths($months);
+        $priceSom = $tariff ? (float)$tariff['price'] : null;
+        $note = $tariff
+            ? sprintf('Запрос оплаты · %s · %s', $tariff['label'], $tariff['price_label'])
+            : 'Запрос ручной оплаты · ' . $months . ' мес.';
+
         $sub = Subscription::findForCompany($companyId);
         Subscription::logHistory(
             $companyId,
@@ -72,18 +80,22 @@ class SubscriptionController
             'renewal_requested',
             (string)($sub['plan'] ?? Subscription::PLAN_BUSINESS),
             $months,
+            $priceSom,
             $sub['starts_at'] ?? null,
             $sub['ends_at'] ?? $sub['trial_end'] ?? null,
             (string)($sub['status'] ?? 'expired'),
             'user',
             $userId,
-            'Запрос ручной оплаты · ' . $months . ' мес.'
+            $note
         );
 
         ActivityLogger::log('subscription_request', $companyId, $userId, 'subscription', null, [
             'period_months' => $months,
+            'price_som' => $priceSom,
         ]);
-        $_SESSION['flash_success'] = 'Запрос отправлен. Администратор активирует подписку после оплаты.';
+        $_SESSION['flash_success'] = $tariff
+            ? 'Запрос отправлен: ' . $tariff['label'] . ' · ' . $tariff['price_label']
+            : 'Запрос отправлен. Администратор активирует подписку после оплаты.';
         Response::redirect('/subscription');
     }
 }
